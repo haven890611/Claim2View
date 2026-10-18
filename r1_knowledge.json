@@ -1,0 +1,457 @@
+{
+  "stage": "r1",
+  "version": "essential-verbatim-knowledge-v2",
+  "note": "Original JSON values, prompts, schemas and embedded rule source; not rewritten rules.",
+  "assets": [
+    {
+      "path": "r1/knowledge/attribute_definitions_v2_reference.json",
+      "stage": "r1",
+      "role": "historical_reference_not_executed",
+      "sha256": "fc03a4cb139cdccad9e9de337dc94660e2f30f9118e0b39a21aa3206e7850df1",
+      "format": "json",
+      "content": {
+        "version": "instance_region_v2_draft_4",
+        "review_status": "draft_for_radiologist_and_sonographer_review",
+        "scope": "Operational definitions for report-to-single-view ultrasound grounding. These rules define whether a report attribute is visually supportable; they do not determine diagnosis or whether the report value is clinically correct.",
+        "none_semantics": {
+          "definition": "The literal string none means the source report did not state a usable value, or did not localize the statement to one supported anatomic target.",
+          "prohibition": "none must never encode a clinical negative. Use an explicit statement such as no internal vascularity, no focal lesion, or absent hilum for a reported negative."
+        },
+        "observability_classes": {
+          "not_image_attribute": "Administrative, provenance, or report-discourse metadata; do not ask an image model to verify it.",
+          "context_dependent": "May be assigned only when labels, landmarks, acquisition metadata, or cross-frame correspondence establish identity/location.",
+          "single_frame_conditional": "A single diagnostic frame can support the visible component when all stated prerequisites are present; it cannot automatically support unshown planes or global/negative claims.",
+          "multi_frame_or_survey": "Requires multiple planes, bilateral/region-wide coverage, or a documented survey. One local frame is insufficient."
+        },
+        "reason_codes": {
+          "no_doppler": "Usable color/power/spectral Doppler is absent for a vascularity claim.",
+          "missing_measurement": "A quantitative claim lacks readable calipers/values or validated measurement metadata.",
+          "wrong_plane": "The required imaging plane is absent or cannot be established.",
+          "missing_reference": "The comparison tissue required for a relative echogenicity claim is absent.",
+          "insufficient_region": "The named anatomic target is not shown.",
+          "insufficient_coverage": "The target is partly shown but coverage is inadequate for the scope of the claim.",
+          "unverifiable_identity": "The side, sublocation, or report-instance/image correspondence cannot be established.",
+          "poor_image_quality": "The target is present but not diagnostically readable.",
+          "not_image_attribute": "The field is not a visual claim."
+        },
+        "attribute_definitions": {
+          "schema_version": {
+            "definition": "Public contract version.",
+            "extraction_rule": "Set by software only.",
+            "observability_class": "not_image_attribute",
+            "required_visual_evidence": "None."
+          },
+          "regions": {
+            "definition": "Collection of source-supported area-level assertions not tied to one uniquely described focal object.",
+            "extraction_rule": "Do not pre-create fixed slots. Emit a region only when at least one source statement belongs to it.",
+            "observability_class": "not_image_attribute",
+            "required_visual_evidence": "The collection itself is not visual; assess each clinical field separately."
+          },
+          "instances": {
+            "definition": "Collection of individually described or explicitly representative focal objects.",
+            "extraction_rule": "Create an instance only for an individually described nodule/lymph node or an explicitly selected representative. Do not create instances from regional negatives, unselected groups, or an isolated focus, standalone calcification, or ablation zone that the source does not identify as a nodule, mass, lesion, or mass-like area. A partial quantifier such as some nodules remains group-scoped and must not be copied into every instance.",
+            "observability_class": "not_image_attribute",
+            "required_visual_evidence": "The collection itself is not visual; localize each instance before judging its attributes."
+          },
+          "other_findings": {
+            "definition": "Source-supported findings outside gland/neck regions and nodule/lymph-node instances.",
+            "extraction_rule": "Preserve without expanding or diagnosing. This includes isolated echogenic foci, standalone calcifications, ablation zones not identified as nodules, and group findings without an individually selected representative.",
+            "observability_class": "context_dependent",
+            "required_visual_evidence": "Direct visualization appropriate to the named finding and anatomy."
+          },
+          "region.region_id": {
+            "definition": "Contiguous report-local identifier.",
+            "extraction_rule": "Assign region_1, region_2, and so on in report order.",
+            "observability_class": "not_image_attribute",
+            "required_visual_evidence": "None."
+          },
+          "region.entity_type": {
+            "definition": "gland_region for thyroid parenchyma/anatomy; neck_region for regional cervical survey statements.",
+            "extraction_rule": "Choose from the explicit subject and scope of the source sentence.",
+            "observability_class": "not_image_attribute",
+            "required_visual_evidence": "Not independently verified; use the clinical fields and anatomy for grounding."
+          },
+          "region.anatomic_region": {
+            "definition": "Coarse image-routing target: right_lobe, left_lobe, isthmus, right_neck, left_neck, or none. Cervical level is an independent neck_level axis.",
+            "extraction_rule": "Use a named side/part only when explicit. Bilateral gland/lobes may split into right_lobe and left_lobe; do not add isthmus. Restore an explicit residual/right/left/bilateral lobe or parenchymal scope even when legacy canonical wording lost its subject. An explicitly sided lymph-node statement maps to the corresponding neck side. Non-localized gland or neck side is none. Thyroid bed remains in location/evidence. Never replace a supported neck side with a level; encode the level separately.",
+            "observability_class": "context_dependent",
+            "required_visual_evidence": "Readable side/part annotation, reliable landmarks, acquisition metadata, or unambiguous cross-frame correspondence.",
+            "single_frame_limit": "A cropped unlabeled view often cannot establish side. none is intentionally not assignable to a specific image target."
+          },
+          "region.neck_level": {
+            "definition": "Explicit cervical nodal level I, II, III, IV, V, VI, or VII for a neck_region; none means no single supported level is stated.",
+            "extraction_rule": "Use only an explicitly stated level. Expand an inclusive range such as levels III–V into separate neck regions for III, IV, and V. Keep side independently in anatomic_region. Do not infer a level from proximity to the thyroid, vessels, submandibular region, or another landmark.",
+            "observability_class": "context_dependent",
+            "required_visual_evidence": "Readable level annotation, recognized cervical landmarks with sufficient field of view, acquisition metadata, or expert-confirmed cross-frame correspondence.",
+            "single_frame_limit": "A tight unlabeled crop generally cannot establish cervical level; none is not an image class."
+          },
+          "gland_region.size": {
+            "definition": "Lobe/isthmus dimensions or qualitative enlargement/atrophy of the stated gland region.",
+            "extraction_rule": "Do not infer a side from a whole-gland statement. Route contour/morphology-only wording to shape; retain a sentence in size when it explicitly states size, volume, enlargement/atrophy, or measurements.",
+            "observability_class": "multi_frame_or_survey",
+            "required_visual_evidence": "For quantitative size: complete boundaries and orthogonal measurements; AIUM recommends three dimensions for each lobe and AP isthmus thickness. For qualitative global size: representative complete coverage.",
+            "single_frame_limit": "A single cropped frame can support only the displayed dimension, not normal overall gland size."
+          },
+          "gland_region.shape": {
+            "definition": "Overall form/contour of the stated gland region, not a focal-object margin.",
+            "extraction_rule": "Keep only explicit regional morphology statements. Route contour/morphology/plump wording here unless the same source statement explicitly denotes enlargement, atrophy, size, volume, or measurement.",
+            "observability_class": "single_frame_conditional",
+            "required_visual_evidence": "Readable visible gland contour in the relevant plane.",
+            "single_frame_limit": "One frame supports only visible-plane morphology; a whole-gland normality claim requires broader coverage."
+          },
+          "gland_region.postoperative_status": {
+            "definition": "Explicit postoperative anatomy, absence, or residual thyroid tissue.",
+            "extraction_rule": "Do not infer surgery solely from a small or nonvisualized gland in one frame.",
+            "observability_class": "multi_frame_or_survey",
+            "required_visual_evidence": "Dedicated thyroid-bed survey plus history/annotation sufficient to identify postoperative anatomy.",
+            "single_frame_limit": "A single empty-appearing crop cannot prove prior thyroidectomy or complete absence of tissue."
+          },
+          "gland_region.echogenicity": {
+            "definition": "Brightness of non-focal thyroid parenchyma relative to an appropriate reference.",
+            "extraction_rule": "Keep relative brightness separate from echotexture. Texture-only wording such as homogeneous or heterogeneous belongs in echotexture; explicit increased/decreased echogenicity belongs here.",
+            "observability_class": "single_frame_conditional",
+            "required_visual_evidence": "Representative parenchyma plus strap muscle, normal thyroid reference, or another accepted reference on comparable grayscale settings.",
+            "single_frame_limit": "No relative classification when the reference is absent or gain makes comparison unreliable."
+          },
+          "gland_region.echotexture": {
+            "definition": "Uniformity or heterogeneity of non-focal thyroid parenchymal echoes.",
+            "extraction_rule": "Diffuse disease wording may map here only when it describes the echo pattern; do not add a diagnosis.",
+            "observability_class": "single_frame_conditional",
+            "required_visual_evidence": "A diagnostic representative area outside focal lesions.",
+            "single_frame_limit": "A local frame supports local texture; diffuse or bilateral heterogeneity requires broader representative coverage."
+          },
+          "gland_region.focal_finding_summary": {
+            "definition": "Region-level presence, absence, or multiplicity/burden of focal findings not tied to one uniquely described object.",
+            "extraction_rule": "Keep only a source sentence that explicitly states regional focal presence, absence, or burden/count (for example no focal lesion, a nodule is seen, single/solitary, or multiple/multinodular). Standalone group morphology belongs in the matching core field or a loss-preserving extra attribute; individual size or morphology belongs to an instance.",
+            "observability_class": "multi_frame_or_survey",
+            "required_visual_evidence": "Coverage adequate for the asserted scope. Presence of one visible lesion may be supported locally; absence, single-only, and multiplicity require region/case survey coverage.",
+            "single_frame_limit": "One local image cannot prove no lesion, exactly one lesion in the gland, or total multiplicity."
+          },
+          "gland_region.vascularity": {
+            "definition": "Color/power/spectral Doppler flow pattern of the stated gland region.",
+            "extraction_rule": "none means unreported; an explicit no-flow statement is a clinical negative.",
+            "observability_class": "single_frame_conditional",
+            "required_visual_evidence": "Usable Doppler sampling the relevant parenchyma with settings adequate to detect the claimed flow.",
+            "single_frame_limit": "Grayscale cannot support vascularity. Absence of displayed color is not evidence of absent flow when Doppler settings are unknown."
+          },
+          "neck_region.focal_finding_summary": {
+            "definition": "Regional presence, absence, or multiplicity/burden of cervical lymph nodes or nodules without one uniquely described object.",
+            "extraction_rule": "Keep only a source sentence that explicitly states regional node/focal presence, absence, or burden/count. Do not place standalone group morphology here, and do not fabricate one node instance from a regional negative.",
+            "observability_class": "multi_frame_or_survey",
+            "required_visual_evidence": "Dedicated cervical survey covering the asserted side(s)/levels.",
+            "single_frame_limit": "A single neck image cannot prove absence of abnormal nodes across a neck side or both sides."
+          },
+          "region.extra_attributes": {
+            "definition": "Loss-preserving source attributes not represented by regional core fields.",
+            "extraction_rule": "Preserve the exact supported value without semantic broadening. Group or partial-scope morphology (for example some nodules) belongs here rather than in every instance. Evidence must be the closest source-report span, never a generic placeholder such as region, location, or anatomy.",
+            "observability_class": "context_dependent",
+            "required_visual_evidence": "Feature-specific direct evidence and the coverage implied by its wording."
+          },
+          "instance.instance_id": {
+            "definition": "Contiguous report-local focal-object identifier.",
+            "extraction_rule": "Assign instance_1, instance_2, and so on in report order.",
+            "observability_class": "not_image_attribute",
+            "required_visual_evidence": "None; image matching must establish correspondence separately."
+          },
+          "instance.entity_type": {
+            "definition": "nodule for a focal nodule/mass-like object not supported as a node; lymph_node for an explicit or node-morphology-supported node.",
+            "extraction_rule": "Do not encode thyroid origin, thyroid-bed location, or uncertainty as separate nodule subtypes. Location alone below/adjacent to thyroid does not prove lymph-node identity.",
+            "observability_class": "context_dependent",
+            "required_visual_evidence": "Target localization plus anatomy and morphology. Lymph-node support may include hilum/nodal architecture, cervical level, or explicit report identity.",
+            "single_frame_limit": "A hypoechoic neck nodule without reliable context may remain unverified even if visible."
+          },
+          "instance.identity_certainty": {
+            "definition": "Strength of source-report support for entity_type: explicit, morphology_supported, or indeterminate.",
+            "extraction_rule": "This is NLP/source provenance, not malignancy probability or image-model confidence.",
+            "observability_class": "not_image_attribute",
+            "required_visual_evidence": "None."
+          },
+          "instance.instance_role": {
+            "definition": "individual for one described object; representative for a largest/larger/measured example of a group.",
+            "extraction_rule": "Use representative only when the source discourse explicitly selects an example.",
+            "observability_class": "not_image_attribute",
+            "required_visual_evidence": "A frame cannot prove that an object is representative of all objects without report/case context."
+          },
+          "instance.anatomic_region": {
+            "definition": "Coarse image-routing target using the six-value anatomy enum; cervical level is independently encoded in neck_level.",
+            "extraction_rule": "Use only explicit supported anatomy. An explicitly left- or right-sided lymph node maps to left_neck or right_neck. A focal object explicitly adjacent, inferior, posterior, outside, or lateral to a lobe maps to the corresponding neck side while retaining nodule identity unless node evidence exists. Use none for an unsided, thyroid-bed, midline/other, or otherwise noncanonical coarse location. Never discard an explicit neck level merely because side is absent; encode it in neck_level.",
+            "observability_class": "context_dependent",
+            "required_visual_evidence": "Side annotation, landmarks, acquisition metadata, or unambiguous report-image correspondence.",
+            "single_frame_limit": "Do not infer side from lesion appearance alone."
+          },
+          "instance.neck_level": {
+            "definition": "Explicit cervical level I, II, III, IV, V, VI, or VII for one focal object; none means no single level can be assigned to that object.",
+            "extraction_rule": "Use an explicitly stated single level. For a representative object selected from a multi-level group, use its specifically stated level (for example, a largest node at level V); do not assign the full group range to that one instance. Keep the original range wording in location_detail and the corresponding level regions.",
+            "observability_class": "context_dependent",
+            "required_visual_evidence": "Readable level annotation, sufficient cervical landmarks, acquisition metadata, or expert-confirmed report-image correspondence.",
+            "single_frame_limit": "A focal object can be visible while its neck level remains unverifiable in a cropped unlabeled frame."
+          },
+          "instance.location_detail": {
+            "definition": "Original fine/special location wording such as upper/mid/lower pole, adjacent-to relation, thyroid bed, subcutaneous layer, named neck region, or cervical-level phrase.",
+            "extraction_rule": "Do not use this field merely to repeat the coarse anatomic_region. Preserve source detail and original level/range wording; place the normalized single cervical level in neck_level. Use none if no detail is stated.",
+            "observability_class": "context_dependent",
+            "required_visual_evidence": "Appropriate long-axis/whole-lobe context, level landmarks, labels, or unambiguous cross-frame correspondence.",
+            "single_frame_limit": "A tight crop usually cannot establish pole, thyroid-bed relation, or cervical level."
+          },
+          "instance.size": {
+            "definition": "Object dimensions or explicit qualitative size/enlargement statement.",
+            "extraction_rule": "Preserve the stated dimensions; do not treat placeholders as numerical values.",
+            "observability_class": "single_frame_conditional",
+            "required_visual_evidence": "For exact numbers: readable calipers/values corresponding to the target, or validated DICOM pixel-spacing/measurement metadata with visible complete boundaries. Each frame supports only the shown axis/axes.",
+            "single_frame_limit": "One plane cannot support unshown orthogonal dimensions. Qualitative enlargement of a node may also require short-axis context and clinical threshold definition."
+          },
+          "nodule.composition": {
+            "definition": "Relative solid and fluid content: cystic/almost cystic, spongiform, mixed cystic-solid, or solid/almost solid.",
+            "extraction_rule": "Use only explicit solid/fluid content such as cystic, solid, spongiform, or mixed cystic-solid. The word mixed alone is insufficient and must remain an ambiguity-preserving extra attribute. Do not substitute echotexture or echogenicity.",
+            "observability_class": "single_frame_conditional",
+            "required_visual_evidence": "Diagnostic grayscale view showing the target's internal contents.",
+            "single_frame_limit": "A single plane may miss a small cystic component; confident whole-lesion proportion may require orthogonal views."
+          },
+          "nodule.echogenicity": {
+            "definition": "Nodule brightness relative to thyroid parenchyma; very hypoechoic assessment additionally uses adjacent muscle as reference.",
+            "extraction_rule": "Keep relative brightness separate from echotexture and echogenic foci. Texture-only wording such as homogeneous or heterogeneous belongs in echotexture.",
+            "observability_class": "single_frame_conditional",
+            "required_visual_evidence": "Visible target and reference tissue on comparable grayscale settings.",
+            "single_frame_limit": "A crop without reference tissue cannot support a relative category."
+          },
+          "nodule.echotexture": {
+            "definition": "Uniformity/heterogeneity of echoes within the nodule, distinct from overall brightness and solid/fluid composition.",
+            "extraction_rule": "Use only explicit internal texture wording, including heterogeneous/homogeneous and pattern terms such as honeycomb-, grid-, confluent-, or mixed-echo appearance. Mixed echo describes internal variation, not a single relative-brightness category.",
+            "observability_class": "single_frame_conditional",
+            "required_visual_evidence": "Diagnostic grayscale visualization of internal echoes.",
+            "single_frame_limit": "One plane supports the displayed internal pattern only."
+          },
+          "nodule.shape": {
+            "definition": "Overall geometric form/contour such as oval, round, or irregular.",
+            "extraction_rule": "Do not use this field for taller-than-wide (orientation) or for boundary definition (margin).",
+            "observability_class": "single_frame_conditional",
+            "required_visual_evidence": "Diagnostic plane showing the complete visible contour.",
+            "single_frame_limit": "One plane does not prove three-dimensional shape."
+          },
+          "nodule.margin": {
+            "definition": "Definition and character of the nodule-parenchyma boundary: smooth, ill-defined, lobulated, or irregular.",
+            "extraction_rule": "Do not use regular/irregular shape wording unless it explicitly refers to the boundary.",
+            "observability_class": "single_frame_conditional",
+            "required_visual_evidence": "A diagnostic view showing most or all of the boundary.",
+            "single_frame_limit": "A partly cropped/obscured boundary cannot support a global smooth-margin claim."
+          },
+          "nodule.echogenic_foci": {
+            "definition": "Discrete echogenic reflectors/artifacts including punctate foci, macrocalcification, rim calcification, and comet-tail artifact.",
+            "extraction_rule": "Do not classify the whole nodule as hyperechoic from focal reflectors.",
+            "observability_class": "single_frame_conditional",
+            "required_visual_evidence": "High-resolution grayscale detail adequate to identify foci and associated artifact/shadow.",
+            "single_frame_limit": "Absence is supportable only if the full relevant target is well visualized."
+          },
+          "nodule.posterior_acoustic_feature": {
+            "definition": "Enhancement, shadowing, or another acoustic effect deep to the nodule.",
+            "extraction_rule": "The lesion and deep tissue must be part of the same stated observation.",
+            "observability_class": "single_frame_conditional",
+            "required_visual_evidence": "Frame containing the nodule and sufficient tissue posterior to it.",
+            "single_frame_limit": "A crop ending at the lesion cannot support this field."
+          },
+          "nodule.vascularity": {
+            "definition": "Doppler flow distribution within and/or around the nodule.",
+            "extraction_rule": "none is missing data, not no flow.",
+            "observability_class": "single_frame_conditional",
+            "required_visual_evidence": "Usable Doppler with the nodule boundary identifiable and settings adequate for the claimed flow.",
+            "single_frame_limit": "Grayscale cannot support the claim; no displayed signal does not prove no flow when settings are unknown."
+          },
+          "nodule.orientation": {
+            "definition": "Relationship of the anteroposterior dimension to the transverse dimension, especially wider-than-tall versus taller-than-wide.",
+            "extraction_rule": "Keep separate from shape.",
+            "observability_class": "single_frame_conditional",
+            "required_visual_evidence": "Confirmed transverse plane with the full target contour or axes.",
+            "single_frame_limit": "A longitudinal or unknown plane cannot support taller-than-wide classification."
+          },
+          "nodule.capsular_relation": {
+            "definition": "Spatial relationship between nodule and thyroid capsule: contact, abutment, distortion, disruption, or suspected extension.",
+            "extraction_rule": "Do not put thyroid-bed location here. Do not upgrade contact/abutment to extrathyroidal extension.",
+            "observability_class": "single_frame_conditional",
+            "required_visual_evidence": "Target and adjacent capsule visible together; extension claims should be corroborated in multiple planes.",
+            "single_frame_limit": "A single tangent plane may support contact but is generally insufficient to exclude or definitively establish extension."
+          },
+          "lymph_node.cystic_change": {
+            "definition": "Cystic internal change in a lymph node.",
+            "extraction_rule": "Use this node-specific field instead of nodule composition.",
+            "observability_class": "single_frame_conditional",
+            "required_visual_evidence": "Diagnostic grayscale visualization of internal nodal content.",
+            "single_frame_limit": "Absence requires adequate visualization of the full node and may need another plane."
+          },
+          "lymph_node.echogenicity": {
+            "definition": "Internal nodal brightness pattern, including abnormal focal or diffuse hyperechogenicity.",
+            "extraction_rule": "Do not confuse an echogenic hilum with diffuse nodal hyperechogenicity. Texture-only wording such as homogeneous or heterogeneous belongs in echotexture.",
+            "observability_class": "single_frame_conditional",
+            "required_visual_evidence": "Diagnostic grayscale view of the identified node.",
+            "single_frame_limit": "Identity must first be established."
+          },
+          "lymph_node.echotexture": {
+            "definition": "Uniformity or heterogeneity of internal nodal echoes.",
+            "extraction_rule": "Keep internal uniformity/pattern separate from brightness, cystic change, and hilum. Mixed-echo wording belongs here rather than in echogenicity.",
+            "observability_class": "single_frame_conditional",
+            "required_visual_evidence": "High-quality grayscale view resolving internal architecture.",
+            "single_frame_limit": "One plane supports the displayed internal pattern only."
+          },
+          "lymph_node.shape": {
+            "definition": "Nodal geometry such as oval versus round, based on long- and short-axis proportions.",
+            "extraction_rule": "Do not substitute a subjective margin description.",
+            "observability_class": "single_frame_conditional",
+            "required_visual_evidence": "Plane showing the complete contour and interpretable long/short axes.",
+            "single_frame_limit": "An oblique or cropped plane can falsely alter the apparent axis ratio."
+          },
+          "lymph_node.margin": {
+            "definition": "Definition and regularity of the nodal boundary.",
+            "extraction_rule": "Keep separate from overall node shape.",
+            "observability_class": "single_frame_conditional",
+            "required_visual_evidence": "Diagnostic view showing most or all of the node boundary.",
+            "single_frame_limit": "Do not accept when the boundary is obscured or cropped."
+          },
+          "lymph_node.echogenic_foci": {
+            "definition": "Discrete nodal echogenic foci, including micro- or macrocalcification.",
+            "extraction_rule": "Keep separate from hilum and diffuse hyperechogenicity.",
+            "observability_class": "single_frame_conditional",
+            "required_visual_evidence": "High-resolution grayscale detail of the node.",
+            "single_frame_limit": "A negative requires adequate full-node visualization."
+          },
+          "lymph_node.vascularity": {
+            "definition": "Doppler flow distribution such as central/hilar, peripheral, or diffuse.",
+            "extraction_rule": "none is missing data, not no flow.",
+            "observability_class": "single_frame_conditional",
+            "required_visual_evidence": "Identified node with usable Doppler and adequate settings.",
+            "single_frame_limit": "Grayscale cannot support this field; absence of displayed color is not automatically absent flow."
+          },
+          "lymph_node.hilum": {
+            "definition": "Presence, absence, or displacement of the echogenic nodal hilum.",
+            "extraction_rule": "Apply only to lymph_node instances.",
+            "observability_class": "single_frame_conditional",
+            "required_visual_evidence": "Diagnostic grayscale view resolving internal nodal architecture.",
+            "single_frame_limit": "Nonvisualization on one suboptimal plane does not prove absent hilum."
+          },
+          "instance.extra_attributes": {
+            "definition": "Loss-preserving source attributes not represented by entity-specific core fields.",
+            "extraction_rule": "Preserve exact value/evidence and interpret only that stated meaning.",
+            "observability_class": "context_dependent",
+            "required_visual_evidence": "Direct feature evidence plus identity/coverage inherent to the statement."
+          },
+          "extra_attribute.attribute_name": {
+            "definition": "Name of a non-core source attribute.",
+            "extraction_rule": "Use a stable descriptive name without duplicating a core field unless required for migration provenance.",
+            "observability_class": "not_image_attribute",
+            "required_visual_evidence": "None."
+          },
+          "extra_attribute.value": {
+            "definition": "Preserved clinical value of the non-core attribute.",
+            "extraction_rule": "Do not normalize beyond the supported source meaning.",
+            "observability_class": "context_dependent",
+            "required_visual_evidence": "Feature-specific."
+          },
+          "extra_attribute.evidence": {
+            "definition": "Closest source-report text supporting the extra value.",
+            "extraction_rule": "Must be the shortest sufficient source-derived report span; when side is inherited across sentences, use the shortest contiguous span containing both the side context and focal statement. Do not generate new clinical evidence or use generic placeholders such as region, location, or anatomy.",
+            "observability_class": "not_image_attribute",
+            "required_visual_evidence": "None."
+          },
+          "other_finding.anatomy": {
+            "definition": "Source-stated anatomy for a nonstandard finding.",
+            "extraction_rule": "Use none if the report does not state anatomy.",
+            "observability_class": "context_dependent",
+            "required_visual_evidence": "Labels/landmarks sufficient to establish the named anatomy."
+          },
+          "other_finding.finding": {
+            "definition": "Preserved nonstandard finding.",
+            "extraction_rule": "Do not convert it to nodule or lymph_node unless it describes a positive focal object meeting instance rules.",
+            "observability_class": "context_dependent",
+            "required_visual_evidence": "Direct visualization appropriate to the named finding."
+          },
+          "other_finding.evidence": {
+            "definition": "Closest source-report text supporting the other finding.",
+            "extraction_rule": "Must be source-derived.",
+            "observability_class": "not_image_attribute",
+            "required_visual_evidence": "None."
+          }
+        },
+        "references": [
+          {
+            "title": "ACR Thyroid Imaging Reporting and Data System (TI-RADS)",
+            "url": "https://www.acr.org/Clinical-Resources/Clinical-Tools-and-Reference/Reporting-and-Data-Systems/TI-RADS",
+            "use": "Standard thyroid-nodule lexicon and reporting categories."
+          },
+          {
+            "title": "ACR TI-RADS Diagnostic Ultrasound Reporting Template",
+            "url": "https://www.acr.org/-/media/ACR/Files/RADS/TI-RADS/TI-RADS-Diagnostic-Ultrasound-Reporting-Template.pdf",
+            "use": "Composition, echogenicity, shape/orientation, margin, echogenic foci, size, and location reporting."
+          },
+          {
+            "title": "AIUM Practice Parameter for Diagnostic Ultrasound of the Thyroid and Extracranial Head and Neck (2023)",
+            "url": "https://onlinelibrary.wiley.com/doi/10.1002/jum.16251",
+            "doi": "10.1002/jum.16251",
+            "use": "Required planes, thyroid and focal-abnormality measurements, adjacent soft tissues, and Doppler."
+          },
+          {
+            "title": "2023 European Thyroid Association Clinical Practice Guidelines for thyroid nodule management",
+            "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC10448590/",
+            "doi": "10.1530/ETJ-23-0067",
+            "use": "Reporting elements, three dimensions, neck levels, lymph-node features, and extrathyroidal extension."
+          },
+          {
+            "title": "Standardized Imaging and Reporting for Thyroid Ultrasound: Korean Society of Thyroid Radiology Consensus Statement",
+            "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC9830140/",
+            "doi": "10.3348/kjr.2022.0894",
+            "use": "Definitions for gland echogenicity/echotexture, nodule fields, node location/category, and standardized reporting."
+          }
+        ],
+        "method_note": "The clinical terms and required ultrasound views are guideline-grounded. The single-frame acceptance/rejection rules are an engineering operationalization inferred from those requirements and from the downstream visual-grounding task; they require local expert validation before clinical or benchmark use."
+      }
+    },
+    {
+      "path": "r1/knowledge/region_v22_contract.json",
+      "stage": "r1",
+      "role": "current_schema_contract_documentation",
+      "sha256": "c81b531df82f719f84e61cc0a43e827844310a5329e6397147d0d9a00d7f9605",
+      "format": "json",
+      "content": {
+        "version": "instance_region_v2_2_packaged_contract",
+        "status": "Documentation of existing transformation; no new extraction or clinical filtering rules",
+        "base_attribute_reference": "attribute_definitions_v2_reference.json",
+        "base_reference_status": "Historical v2 draft reference; not a v2.2 executable schema and not the current claim acceptance policy",
+        "schema_version": "instance_region_v2_2",
+        "region_entity_types": [
+          "gland_region",
+          "neck_region",
+          "isthmus_region"
+        ],
+        "instance_entity_types": [
+          "nodule",
+          "lymph_node"
+        ],
+        "anatomic_region_values": [
+          "left_lobe",
+          "right_lobe",
+          "isthmus",
+          "left_neck",
+          "right_neck",
+          "none"
+        ],
+        "region_merge": "Existing v2.2 source transformation incorporates unspecified-side Region content into known-side Regions of the same entity_type. Neck levels remain distinct Regions; Instance entities unchanged.",
+        "isthmus_region": {
+          "anatomic_region": "isthmus",
+          "thickness": "Original isthmus size wording, not an estimated measurement.",
+          "morphology": "Original isthmus shape/morphology wording.",
+          "other_fields": [
+            "postoperative_status",
+            "echogenicity",
+            "echotexture",
+            "focal_finding_summary",
+            "vascularity",
+            "extra_attributes"
+          ],
+          "reference_field_aliases": {
+            "thickness": "gland_region.size",
+            "morphology": "gland_region.shape"
+          }
+        },
+        "none_semantics": "Not reported or not localized; never a clinical negative.",
+        "runtime_policy": "R1 full data are already transformed. Round3 executes only its own explicit deterministic policy, not every observability statement from the historical reference."
+      }
+    }
+  ]
+}
