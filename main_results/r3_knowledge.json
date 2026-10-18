@@ -1,0 +1,1260 @@
+{
+  "stage": "r3",
+  "version": "essential-verbatim-knowledge-v2",
+  "note": "Original JSON values, prompts, schemas and embedded rule source; not rewritten rules.",
+  "steps": [
+    {
+      "stage": "round1",
+      "assets": [
+        {
+          "path": "r3/knowledge/region_v94_compact_family_rules.json",
+          "stage": "round1",
+          "role": "active_model_knowledge",
+          "sha256": "052c9a4c94200c96feb51aa351f376424843e161a655fa4a32092e59f91d2358",
+          "format": "json",
+          "content": {
+            "version": "region_v94_compact_family_rules",
+            "purpose": "Keep family features atomic and few while preserving the OR candidate gate.",
+            "rules": [
+              {
+                "rule_id": "KF01",
+                "rule": "Create exactly one entity-tissue feature from entity_type."
+              },
+              {
+                "rule_id": "KF02",
+                "rule": "For a positive focal summary, create one base feature asking only whether at least one compatible focal target is visible."
+              },
+              {
+                "rule_id": "KF03",
+                "rule": "Multiplicity and one explicit basic appearance may be separate optional features; neither may be combined with tissue or location."
+              },
+              {
+                "rule_id": "KF04",
+                "rule": "For negative or none summaries, use only the tissue feature; never create absence, location, size, or vascularity features."
+              }
+            ]
+          }
+        },
+        {
+          "path": "r3/decision_contract.json",
+          "stage": "round1",
+          "role": "active_finalization_contract",
+          "sha256": "aad9653511761b4d8480c299f4c538a7ea73a0f7d804850af856930498f62db7",
+          "format": "json",
+          "content": {
+            "method": "region_v94_optional_anatomy_location_conflict_family_collapse",
+            "family_gate": "family_candidate_yes_from_atomic_feature_OR",
+            "ignored_as_mandatory": [
+              "RG01_AREA_VISIBLE",
+              "RG03_TRUSTED_CARD_ANATOMY_COMPATIBLE"
+            ],
+            "hard_conflicts": [
+              "RG04_TRUSTED_CARD_LATERALITY_COMPATIBLE",
+              "RG02_KNOWN_LOCATION_COMPATIBLE"
+            ],
+            "unknown_is_conflict": false,
+            "family_collapse": {
+              "version": "v9.2",
+              "trigger": "R2 laterality does not contain both left and right",
+              "resolved_member": "retain the unique member matching known R2 laterality",
+              "unresolved_member": "retain the minimum numeric region_id as representative",
+              "bilateral_card": "preserve multiple selected family members"
+            }
+          }
+        },
+        {
+          "path": "r3/prompts/region_v94.txt",
+          "stage": "round1",
+          "role": "active_prompt",
+          "sha256": "ea79162a2c7ec2d4713f73823e320908f0a112b851cdc241e028961b55aba5c0",
+          "format": "txt",
+          "content": "You are performing Region v9.4 visual filtering for two ordered thyroid\nultrasound images. V9.4 uses the atomic OR family gate and v9.2 plane\nconfidence handling, trusted R2 position constraints, deterministic decision\norder, and downstream family collapse.\n\nCandidate keys and IDs are bookkeeping, not evidence. Do not identify INSTANCE\nobjects. Unknown/none location is neutral and never positive evidence.\n\nTRUSTED R2 CARD\n\nAn R2 axis is trusted only when confidence >= 0.80, needs_review=false, and it\ncontains a known value. Low-confidence, needs-review, or unknown anatomy is\nuntrusted. Multi-valued laterality is compatible on set intersection.\n\nSTEP 1 — COMPACT FAMILY KNOWLEDGE\n\nApply every supplied KNOWLEDGE_JSON rule. Cover every family exactly once.\nCopy entity_type and focal_finding_summary exactly. Create 1–4 atomic visible\nfeatures, each with a unique ID and why_required beginning with exactly one tag:\n\n- [entity_tissue]\n- [target_presence]\n- [multiplicity]\n- [appearance]\n\nEach feature asks about one fact only. Target presence must not include tissue,\nlaterality, location, count, or another property. Use \"at least one compatible\nfocal target\" for the base positive-summary feature.\n\nSTEP 2 — LOCAL PLANE AUDIT\n\nUse only RP01, RP02, and RP03. Plane alone never keeps or rejects a REGION.\n\n- RP01_CONFIDENCE_GATED_PLANE_USE applies when plane confidence <0.80 or\n  value=unknown.\n- RP02_LOCAL_PLANE_AUDIT always records accepted, revised, or indeterminate\n  using pixels and visible labels/landmarks.\n- RP03_INDETERMINATE_PLANE_IS_NEUTRAL applies exactly when status is\n  indeterminate and requires effective_plane=unknown.\n\nSTEP 3 — OR FAMILY-CANDIDATE CHECK\n\nFor each image, include family_decisions only for families having at least one\ncandidate_key in that image's eligible_candidate_keys. Answer every atomic\nfeature once for each such eligible family. matched=yes requires direct evidence\nfor that individual fact. family_candidate=yes iff at least one feature is yes.\nA focal target may be yes even when its tissue, side, location, or multiplicity\nis unknown. Missing summary details are deferred to claim-level review.\n\nSTEP 4 — MEMBER RULES\n\nRG01_AREA_VISIBLE:\n\n1. If trusted R2 anatomic_region is compatible with the member compartment,\n   answer yes deterministically. Do not re-judge or override trusted matching\n   R2 tissue from pixels.\n2. Otherwise, if R2 anatomy is unknown, low-confidence, or needs_review, judge\n   pixels directly: gland_region requires thyroid parenchyma, isthmus_region\n   requires midline/isthmus tissue, and neck_region requires a deliberate\n   extra-thyroid cervical field.\n3. If trusted R2 anatomy is disjoint, direct RG01 evidence may still be\n   recorded, but RG03 will deterministically reject the member.\n\nRG02_KNOWN_LOCATION_COMPATIBLE:\nCompare assessable pixels/labels with known member laterality, anatomic region,\nneck level, and source extent. Answer yes, no for definite conflict, or\nindeterminate. Unknown/none never conflicts.\n\nRG03_TRUSTED_CARD_ANATOMY_COMPATIBLE:\nCompute deterministically. Trusted intersecting anatomy is yes, trusted\ndisjoint thyroid versus neck is no, otherwise not_applicable.\n\nRG04_TRUSTED_CARD_LATERALITY_COMPATIBLE:\nCompute deterministically. Trusted intersecting side is yes, trusted disjoint\nside is no, otherwise not_applicable. Unknown member side is not a match.\n\nFINAL ORDER\n\n1. family_candidate=no -> family_visual_features_not_matched.\n2. RG01=no -> area_not_visible.\n3. RG03=no -> trusted_card_anatomy_conflict.\n4. RG04=no -> trusted_card_laterality_conflict.\n5. RG02=no -> known_location_conflict.\n6. Otherwise keep -> matched_family_tissue_and_location.\n\nCover every family, feature, image, and eligible candidate exactly once.\n"
+        },
+        {
+          "path": "r3/src/region_family_collapse_v92.py",
+          "stage": "round1",
+          "role": "active_embedded_family_rules",
+          "sha256": "f326b86c4d21c8a92e4e731ddcd5ff4eb79a27cee35b5abfa0df0da415123d0c",
+          "format": "py",
+          "content": "\"\"\"Deterministic v9.2 member collapse on top of v9.1 REGION decisions.\n\nV9.2 does not ask the model to reinterpret an image.  It collapses multiple\nselected members of the same REGION family whenever the trusted R2 card does\nnot explicitly contain both ``left`` and ``right``.  A concrete entity ID is\nretained for downstream schema compatibility, but an arbitrary representative\nis explicitly marked unresolved.\n\"\"\"\n\nfrom __future__ import annotations\n\nimport hashlib\nimport json\nimport re\nfrom collections import defaultdict\nfrom typing import Any\n\n\ndef _opaque_family(payload: Any) -> str:\n    rendered = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(\",\", \":\"))\n    digest = hashlib.sha256(rendered.encode(\"utf-8\")).hexdigest()[:12]\n    return f\"collapse_family_{digest}\"\n\n\ndef _region_number(entity_id: str) -> tuple[int, str]:\n    match = re.search(r\"(\\d+)$\", entity_id)\n    return (int(match.group(1)) if match else 10**9, entity_id)\n\n\ndef _known_sides(values: Any) -> set[str]:\n    raw = values if isinstance(values, (list, tuple, set)) else [values]\n    return {str(value) for value in raw if str(value) in {\"left\", \"right\", \"midline\"}}\n\n\ndef _summary_none_signature(region: dict[str, Any]) -> str | None:\n    \"\"\"Identify exact non-location-equivalent summary-none members.\n\n    ``neck_level`` and every clinical attribute remain in the signature.\n    Only the schema ID and anatomic side label are removed.  Therefore regions\n    at different neck levels or with different findings cannot be merged.\n    \"\"\"\n    if str(region.get(\"focal_finding_summary\", \"none\") or \"none\").strip().lower() != \"none\":\n        return None\n    comparable = {\n        key: value\n        for key, value in region.items()\n        if key not in {\"region_id\", \"anatomic_region\"}\n    }\n    return json.dumps(comparable, ensure_ascii=False, sort_keys=True, separators=(\",\", \":\"))\n\n\nclass _UnionFind:\n    def __init__(self, values: set[str]) -> None:\n        self.parent = {value: value for value in values}\n\n    def find(self, value: str) -> str:\n        parent = self.parent[value]\n        if parent != value:\n            self.parent[value] = self.find(parent)\n        return self.parent[value]\n\n    def union(self, left: str, right: str) -> None:\n        left_root = self.find(left)\n        right_root = self.find(right)\n        if left_root != right_root:\n            self.parent[right_root] = left_root\n\n\ndef collapse_families(\n    payload: dict[str, Any], report: dict[str, Any]\n) -> tuple[dict[str, str], list[dict[str, Any]], dict[str, set[str]]]:\n    \"\"\"Return augmented family IDs, auditable groups, and entity lateralities.\n\n    Existing v9.1 families remain authoritative.  The only augmentation is the\n    previously accepted correction for summary-none regions: exact equality of\n    every non-location field also makes left/right members one family.\n    \"\"\"\n    regions = {\n        str(region[\"region_id\"]): region\n        for region in report.get(\"regions\", []) or []\n    }\n    eligible_ids = {\n        str(entity_id)\n        for family in payload[\"region_families\"]\n        for member in family[\"members\"]\n        for entity_id in member[\"entity_ids\"]\n    }\n    union = _UnionFind(eligible_ids)\n    laterality: dict[str, set[str]] = {}\n\n    for family in payload[\"region_families\"]:\n        members = [\n            (str(entity_id), member)\n            for member in family[\"members\"]\n            for entity_id in member[\"entity_ids\"]\n        ]\n        for entity_id, member in members:\n            laterality[entity_id] = _known_sides(\n                member[\"region_location\"].get(\"member_laterality\", [])\n            )\n        for (first, _), (other, _) in zip(members, members[1:]):\n            union.union(first, other)\n\n    exact_none_groups: dict[str, list[str]] = defaultdict(list)\n    for entity_id in sorted(eligible_ids, key=_region_number):\n        signature = _summary_none_signature(regions[entity_id])\n        if signature is not None:\n            exact_none_groups[signature].append(entity_id)\n    for members in exact_none_groups.values():\n        for entity_id in members[1:]:\n            union.union(members[0], entity_id)\n\n    grouped: dict[str, list[str]] = defaultdict(list)\n    for entity_id in eligible_ids:\n        grouped[union.find(entity_id)].append(entity_id)\n\n    family_by_entity: dict[str, str] = {}\n    groups: list[dict[str, Any]] = []\n    for members in sorted(\n        (sorted(values, key=_region_number) for values in grouped.values()),\n        key=lambda values: _region_number(values[0]),\n    ):\n        family_id = _opaque_family(members)\n        for entity_id in members:\n            family_by_entity[entity_id] = family_id\n        groups.append({\n            \"collapse_family_id\": family_id,\n            \"entity_ids\": members,\n        })\n    return family_by_entity, groups, laterality\n\n\ndef collapse_selected_regions_v92(\n    *,\n    payload: dict[str, Any],\n    report: dict[str, Any],\n    selected: dict[int, set[str]],\n) -> tuple[dict[int, set[str]], list[dict[str, Any]], list[dict[str, Any]]]:\n    \"\"\"Apply the accepted v9.2 trigger and return final selections plus audit.\"\"\"\n    family_by_entity, groups, entity_laterality = collapse_families(payload, report)\n    image_by_index = {\n        int(image[\"image_index\"]): image\n        for image in payload[\"images\"]\n    }\n    result = {int(index): set(values) for index, values in selected.items()}\n    audits: list[dict[str, Any]] = []\n\n    for image_index in sorted(result):\n        image = image_by_index[image_index]\n        image_sides = _known_sides(image[\"image_context\"][\"laterality\"][\"values\"])\n        trigger = not {\"left\", \"right\"} <= image_sides\n        selected_by_family: dict[str, list[str]] = defaultdict(list)\n        for entity_id in result[image_index]:\n            if entity_id in family_by_entity:\n                selected_by_family[family_by_entity[entity_id]].append(entity_id)\n\n        for family_id, members in sorted(selected_by_family.items()):\n            members = sorted(members, key=_region_number)\n            if len(members) <= 1:\n                continue\n            if not trigger:\n                audits.append({\n                    \"image_index\": image_index,\n                    \"collapse_family_id\": family_id,\n                    \"selected_members_before\": members,\n                    \"selected_members_after\": members,\n                    \"triggered\": False,\n                    \"member_resolution\": \"bilateral_image_card_preserved\",\n                    \"reason\": \"r2_laterality_contains_left_and_right\",\n                })\n                continue\n\n            matching = [\n                entity_id\n                for entity_id in members\n                if entity_laterality.get(entity_id, set()) & image_sides\n            ]\n            pool = matching or members\n            representative = min(pool, key=_region_number)\n            removed = sorted(set(members) - {representative}, key=_region_number)\n            result[image_index].difference_update(removed)\n            uniquely_resolved = len(matching) == 1\n            audits.append({\n                \"image_index\": image_index,\n                \"collapse_family_id\": family_id,\n                \"selected_members_before\": members,\n                \"selected_members_after\": [representative],\n                \"removed_members\": removed,\n                \"triggered\": True,\n                \"member_resolution\": (\n                    \"resolved_by_r2_laterality\"\n                    if uniquely_resolved\n                    else \"unresolved_representative\"\n                ),\n                \"reason\": (\n                    \"unique_member_matches_non_bilateral_r2_laterality\"\n                    if uniquely_resolved\n                    else \"minimum_region_id_represents_unresolved_family\"\n                ),\n            })\n\n    return result, audits, groups\n\n"
+        },
+        {
+          "path": "r3/schemas/region_v94.schema.json",
+          "stage": "round1",
+          "role": "active_output_contract",
+          "sha256": "c8e63d15bfce792d662abb05e4e6304050a16efca21a8ccf4b5b42c2a29fa0b1",
+          "format": "json",
+          "content": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "$id": "stage1_region_v91.schema.json",
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "uid",
+              "family_visual_requirements",
+              "image_decisions",
+              "case_reasoning"
+            ],
+            "properties": {
+              "uid": {
+                "type": "string"
+              },
+              "family_visual_requirements": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "region_family_key",
+                    "entity_type",
+                    "finding_summary",
+                    "required_visual_features"
+                  ],
+                  "properties": {
+                    "region_family_key": {
+                      "type": "string"
+                    },
+                    "entity_type": {
+                      "type": "string"
+                    },
+                    "finding_summary": {
+                      "type": "string"
+                    },
+                    "required_visual_features": {
+                      "type": "array",
+                      "minItems": 1,
+                      "maxItems": 6,
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "feature_id",
+                          "visual_requirement",
+                          "why_required"
+                        ],
+                        "properties": {
+                          "feature_id": {
+                            "type": "string"
+                          },
+                          "visual_requirement": {
+                            "type": "string"
+                          },
+                          "why_required": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "image_decisions": {
+                "type": "array",
+                "minItems": 2,
+                "maxItems": 2,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "image_index",
+                    "image_id",
+                    "local_plane_audit",
+                    "family_decisions",
+                    "region_decisions"
+                  ],
+                  "properties": {
+                    "image_index": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 2
+                    },
+                    "image_id": {
+                      "type": "string"
+                    },
+                    "local_plane_audit": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "status",
+                        "effective_plane",
+                        "applied_rule_ids",
+                        "image_evidence"
+                      ],
+                      "properties": {
+                        "status": {
+                          "enum": [
+                            "accepted",
+                            "revised",
+                            "indeterminate"
+                          ]
+                        },
+                        "effective_plane": {
+                          "enum": [
+                            "longitudinal",
+                            "transverse",
+                            "oblique",
+                            "unknown"
+                          ]
+                        },
+                        "applied_rule_ids": {
+                          "type": "array",
+                          "items": {
+                            "enum": [
+                              "RP01_CONFIDENCE_GATED_PLANE_USE",
+                              "RP02_LOCAL_PLANE_AUDIT",
+                              "RP03_INDETERMINATE_PLANE_IS_NEUTRAL"
+                            ]
+                          }
+                        },
+                        "image_evidence": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "family_decisions": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "region_family_key",
+                          "feature_checks",
+                          "family_candidate",
+                          "decision_summary"
+                        ],
+                        "properties": {
+                          "region_family_key": {
+                            "type": "string"
+                          },
+                          "feature_checks": {
+                            "type": "array",
+                            "minItems": 1,
+                            "maxItems": 6,
+                            "items": {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": [
+                                "feature_id",
+                                "matched",
+                                "visual_evidence"
+                              ],
+                              "properties": {
+                                "feature_id": {
+                                  "type": "string"
+                                },
+                                "matched": {
+                                  "enum": [
+                                    "yes",
+                                    "no"
+                                  ]
+                                },
+                                "visual_evidence": {
+                                  "type": "string"
+                                }
+                              }
+                            }
+                          },
+                          "family_candidate": {
+                            "enum": [
+                              "yes",
+                              "no"
+                            ]
+                          },
+                          "decision_summary": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "region_decisions": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "candidate_key",
+                          "region_family_key",
+                          "rule_answers",
+                          "final_decision",
+                          "decision_reason",
+                          "visual_evidence"
+                        ],
+                        "properties": {
+                          "candidate_key": {
+                            "type": "string"
+                          },
+                          "region_family_key": {
+                            "type": "string"
+                          },
+                          "rule_answers": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "RG01_AREA_VISIBLE",
+                              "RG02_KNOWN_LOCATION_COMPATIBLE",
+                              "RG03_TRUSTED_CARD_ANATOMY_COMPATIBLE",
+                              "RG04_TRUSTED_CARD_LATERALITY_COMPATIBLE"
+                            ],
+                            "properties": {
+                              "RG01_AREA_VISIBLE": {
+                                "enum": [
+                                  "yes",
+                                  "no"
+                                ]
+                              },
+                              "RG02_KNOWN_LOCATION_COMPATIBLE": {
+                                "enum": [
+                                  "yes",
+                                  "no",
+                                  "indeterminate"
+                                ]
+                              },
+                              "RG03_TRUSTED_CARD_ANATOMY_COMPATIBLE": {
+                                "enum": [
+                                  "yes",
+                                  "no",
+                                  "not_applicable"
+                                ]
+                              },
+                              "RG04_TRUSTED_CARD_LATERALITY_COMPATIBLE": {
+                                "enum": [
+                                  "yes",
+                                  "no",
+                                  "not_applicable"
+                                ]
+                              }
+                            }
+                          },
+                          "final_decision": {
+                            "enum": [
+                              "keep",
+                              "reject"
+                            ]
+                          },
+                          "decision_reason": {
+                            "enum": [
+                              "matched_family_tissue_and_location",
+                              "family_visual_features_not_matched",
+                              "area_not_visible",
+                              "trusted_card_anatomy_conflict",
+                              "trusted_card_laterality_conflict",
+                              "known_location_conflict"
+                            ]
+                          },
+                          "visual_evidence": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "case_reasoning": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "stage": "round2",
+      "assets": [
+        {
+          "path": "r3/prompts/25_instance_ranked_known_family.txt",
+          "stage": "round2",
+          "role": "active_inventory_matching_knowledge_in_prompt",
+          "sha256": "d5fb535fc7b2721cd441f595b95b084f971e1faea7f37fe1121129ad434c8cd4",
+          "format": "txt",
+          "content": "Ground the compact report INSTANCE candidates to BOTH attached ultrasound\nimages. Return only schema-valid JSON and brief observable evidence. Do not\nuse tools, external files, human annotations, subjective scores, or medical\ndiagnosis. Do not label a visual target as a nodule versus lymph node.\n\n1. INVENTORY FIRST. Inspect pixels and inventory each distinct focal target\nONCE with normalized integer bbox [0,1000], before using report candidate\ncounts. Require T01_LOCALIZED_FOCUS=yes and T03_NOT_LANDMARK_OR_ARTIFACT=yes;\nT02_FINITE_EXTENT cannot be no. T04 targeting/calipers is supporting, not\nnecessary or sufficient. Normal vessels/trachea/muscles/artifacts are not\ntargets. Do not invent a target or duplicate one target to match report count.\nMultiple real targets must be listed separately. Zero targets is legitimate.\n\n2. CROSS-VIEW IDENTITY. Compare every image1 x image2 target. same_object\nrequires target-specific nonlocation identity evidence and no trusted side\ncontradiction, with one-to-one links. Generic appearance, report size, similar\nreport text or SAME FAMILY alone never proves identity. Otherwise choose\ndifferent_objects or uncertain. Uncertainty in evidence is allowed.\n\n3. POSITION. Assess every visible target x eligible candidate for its image.\nPrefilter accept and unresolved both mean CANDIDATE, not final selection.\nNever restore a prefilter reject. Judge laterality_match, anatomic_region_match,\nneck_level_match and location_detail_match: yes/no/not_sure/not_applicable.\nUnknown source = not_applicable; known but not visible = not_sure; only a\nvisible contradiction = no. R2 cards carry confidence/needs_review: trusted\nanatomy can support yes only if the TARGET plausibly lies in that tissue,\nnot because the compartment is seen elsewhere in the frame. Selected Round1\nRegions are positive, non-exhaustive context. A location-unresolved collapsed\nRegion representative has no established source member's side or level.\n\n4. FOCAL FEATURES. For each pair return exactly one attribute_check for the\nUNION of image common_attributes, differing_attributes, and\ncandidate_known_attributes[candidate_key]. No duplicate or extra fields.\nAll-known contrast restriction applies ONLY to differing_attributes.\nIndividually known attributes are assessable even if another candidate has\nnone; an unreported counterpart is NOT an opposite feature or a rejection.\nCommon features support presence but cannot distinguish identical candidates.\nYes = directly observable agreement; no = observable contradiction;\nnot_sure = insufficient view/pixels/context. not_applicable for impossible\nmodality or an uninterpretable source placeholder such as ratio _r_. Do not\nequate phrasing differences with visual differences. Assess independent\nshape/margin/composition/echogenicity/echogenic_foci/other provided attributes;\nfull contour/orientation/capsule may require unavailable extent/landmarks.\nNo size assessment. Vascularity only with visible Doppler. More report text\nalone is NOT stronger visual evidence; do not manufacture yes to break ties.\n\n5. PROGRAM SELECTION. Explicit location/feature no vetoes a pair; no positive\nyes anywhere rejects it. Maximize legal observed-target coverage, then rank\nlexicographically by anatomy yes, count of different OR individually known\nfocal features yes, laterality yes, count of location-detail/neck-level yes,\nthen common-feature yes count. No weighted coefficients or new thresholds.\nOne target gets at most one candidate. A single object cannot cover several\ntargets within one image or repeat across images without same_object.\nKnown same-object targets cannot receive different report identities. Report\ngroups may cover several targets. Targets can stay unmatched if no supported\ncandidate exists; never force matching an incompatible report entity.\n\n6. FAMILY. Supplied report-only family_groups identify identical nonlocation\ncontent within the same entity type, compartment and object scope. Size is\nexcluded because it cannot be grounded in this dataset. None is NOT a\nwildcard, so an unknown feature is not equivalent to a known feature. Family\nmembers may differ in side/level/location. Assess actual candidate locations\nhonestly; do not hallucinate a source member to distinguish such members.\nProgram resolves evidence ties reproducibly, tracks family-level selection,\nand rejects unsupported position claims downstream. Family does not prove\nsame_object or waive an explicit visual/location contradiction. Atomic\nnot_sure may remain, but final entity states are selected/rejected only.\n"
+        },
+        {
+          "path": "r3/src/instance_card_prefilter.py",
+          "stage": "round2",
+          "role": "active_embedded_location_prefilter",
+          "sha256": "657e6ea7a2d9648ef43afd7ed7373cbf1fc2a76421303ca85868418c1ef0966a",
+          "format": "py",
+          "content": "\"\"\"Exact portable copies of the accepted confidence-.8 card prefilter helpers.\"\"\"\nKNOWN_NONE = {\"\", \"none\", \"unknown\", \"unspecified\", \"not specified\", \"null\"}\n\n\ndef known_values(values):\n    raw = values if isinstance(values, (list, tuple, set)) else [values]\n    return {str(v) for v in raw if str(v or \"\").strip().lower() not in KNOWN_NONE}\n\n\ndef axis_values(axis):\n    return known_values(axis.get(\"values\", [axis.get(\"value\", \"unknown\")]))\n\n\ndef trusted(axis):\n    return (float(axis.get(\"confidence\", 0)) >= .80\n            and not bool(axis.get(\"needs_review\", True)) and bool(axis_values(axis)))\n\n\ndef compare_axis(axis, candidates):\n    if not trusted(axis) or not candidates:\n        return \"unknown\"\n    return \"match\" if not axis_values(axis).isdisjoint(candidates) else \"conflict\"\n\n\ndef decision(card, candidate):\n    conditions = candidate[\"conditions\"]\n    comparisons = {\"laterality\": compare_axis(card[\"laterality\"], known_values(conditions[\"laterality\"])),\n                   \"anatomy\": compare_axis(card[\"anatomic_region\"], known_values(conditions[\"anatomy\"]))}\n    state = (\"reject\" if \"conflict\" in comparisons.values() else\n             \"accept\" if all(v == \"match\" for v in comparisons.values()) else \"unresolved\")\n    return state, comparisons\n"
+        },
+        {
+          "path": "r3/src/instance_round2_target_ranked.py",
+          "stage": "round2",
+          "role": "active_embedded_boolean_and_ranking_rules",
+          "sha256": "5ec752045753078bd3c57a3f85dec62af7fb3b6741f7c9d362e1d11f48ac3932",
+          "format": "py",
+          "content": "\"\"\"Boolean-evidence ranked, complete Instance decisions; never emit unresolved.\n\nThe inventory determines capacity, not a requirement to fabricate a match.\nOnly ties after all observable evidence use stable source IDs, explicitly\nrecorded as forced decisions rather than established clinical identities.\n\"\"\"\nimport re\n\nfrom .instance_round2_target_contrast import LOCATION_FIELDS, validated_context\n\nRANK_ORDER = (\n    \"anatomic_region_yes\",\n    \"differing_attribute_yes_count\",\n    \"laterality_yes\",\n    \"location_detail_or_neck_level_yes_count\",\n    \"common_attribute_yes_count\",\n)\n\n\ndef natural_id(value):\n    return tuple((1, int(part)) if part.isdigit() else (0, part)\n                 for part in re.split(r\"(\\d+)\", str(value)))\n\n\ndef candidate_order(candidate):\n    # Opaque hashes and list order are not tie-breaks.\n    return tuple(sorted((natural_id(e) for e in candidate[\"entity_ids\"])))\n\n\ndef pair_rank(image, pair):\n    checks = {c[\"field\"]: c[\"answer\"] for c in pair[\"attribute_checks\"]}\n    return (\n        int(pair[\"anatomic_region_match\"] == \"yes\"),\n        sum(checks[f] == \"yes\" for f in\n            set(image[\"differing_attributes\"]) |\n            set(image.get(\"candidate_known_attributes\", {}).get(pair[\"candidate_key\"], {}))),\n        int(pair[\"laterality_match\"] == \"yes\"),\n        sum(pair[f] == \"yes\" for f in (\"location_detail_match\", \"neck_level_match\")),\n        sum(checks[f] == \"yes\" for f in image[\"common_attributes\"]),\n    )\n\n\ndef finalize_ranked(payload, output, max_nodes=200000, external_inventory=None):\n    output, targets, images, relations, pairs, renamed = validated_context(payload, output, external_inventory=external_inventory)\n    candidates = {c[\"candidate_key\"]: c for c in payload[\"instance_candidates\"]}\n    options, ranks, edge_audit = {}, {}, []\n    for (i, t, c), pair in pairs.items():\n        answers = [pair[f] for f in LOCATION_FIELDS] + [a[\"answer\"] for a in pair[\"attribute_checks\"]]\n        if \"no\" in answers:\n            reason = \"explicit_location_or_attribute_conflict\"\n        elif \"yes\" not in answers:\n            reason = \"no_positive_attribute_match\"\n        else:\n            reason = \"eligible\"\n            options.setdefault((i, t), []).append(c)\n            ranks[(i, t, c)] = pair_rank(images[i], pair)\n        edge_audit.append({\"image_index\": i, \"target_id\": t, \"candidate_key\": c,\n                           \"status\": reason, \"rank\": list(ranks.get((i, t, c), ()))})\n\n    for values in options.values():\n        values.sort(key=lambda c: candidate_order(candidates[c]))\n    target_keys = [(i, t) for i in (1, 2) for t in sorted(targets[i])]\n    selected_edges, used = [], {}\n    best_objective, best_edges, best_signature = None, [], None\n    optimal_count, visited = 0, 0\n    optimal_union, optimal_intersection = set(), set()\n    optimal_edge_union = set()\n\n    def signature(edges):\n        # Source-ID tie-break, then image index and target ID. It is a total\n        # order only for reproducibility, NOT additional visual evidence.\n        return tuple(sorted((candidate_order(candidates[c]), i, t) for i, t, c in edges))\n\n    def visit(position, rank_sum):\n        nonlocal visited, best_objective, best_edges, best_signature\n        nonlocal optimal_count, optimal_union, optimal_intersection, optimal_edge_union\n        visited += 1\n        if visited > max_nodes:\n            raise RuntimeError(\"ranking enumeration budget exceeded; no partial final decision emitted\")\n        if best_objective is not None and len(selected_edges) + len(target_keys) - position < best_objective[0]:\n            return\n        if position == len(target_keys):\n            objective = (len(selected_edges),) + rank_sum\n            candidate_pairs = {(i, c) for i, t, c in selected_edges}\n            stable = signature(selected_edges)\n            if best_objective is None or objective > best_objective:\n                best_objective, best_edges, best_signature = objective, list(selected_edges), stable\n                optimal_count = 1\n                optimal_union, optimal_intersection = set(candidate_pairs), set(candidate_pairs)\n                optimal_edge_union = set(selected_edges)\n            elif objective == best_objective:\n                optimal_count += 1\n                optimal_union |= candidate_pairs\n                optimal_intersection &= candidate_pairs\n                optimal_edge_union |= set(selected_edges)\n                if stable < best_signature:\n                    best_edges, best_signature = list(selected_edges), stable\n            return\n        i, t = target_keys[position]\n        for c in options.get((i, t), []):\n            # Known same-object targets cannot receive different report IDs.\n            if any(old_i != i and old_c != c and\n                   relations[(old_t, t) if i == 2 else (t, old_t)][\"relation\"] == \"same_object\"\n                   for old_i, old_t, old_c in selected_edges):\n                continue\n            previous = used.get(c, [])\n            if candidates[c][\"object_scope\"] == \"single_object\":\n                if any(old_i == i for old_i, old_t in previous):\n                    continue\n                if previous:\n                    old_i, old_t = previous[0]\n                    if relations[(old_t, t) if i == 2 else (t, old_t)][\"relation\"] != \"same_object\":\n                        continue\n            used[c] = previous + [(i, t)]\n            selected_edges.append((i, t, c))\n            visit(position + 1, tuple(a + b for a, b in zip(rank_sum, ranks[(i, t, c)])))\n            selected_edges.pop()\n            if previous:\n                used[c] = previous\n            else:\n                used.pop(c, None)\n        visit(position + 1, rank_sum)\n\n    visit(0, (0,) * len(RANK_ORDER))\n    chosen_pairs = {(i, c) for i, t, c in best_edges}\n    selected = {str(i): sorted({e for ii, c in chosen_pairs if ii == i for e in candidates[c][\"entity_ids\"]}, key=natural_id)\n                for i in (1, 2)}\n    rejected = {str(i): sorted({e for c, candidate in candidates.items() if (i, c) not in chosen_pairs for e in candidate[\"entity_ids\"]}, key=natural_id)\n                for i in (1, 2)}\n    assignments = [{\"image_index\": i, \"target_id\": t, \"candidate_key\": c,\n                    \"entity_ids\": candidates[c][\"entity_ids\"], \"rank\": list(ranks[(i, t, c)]),\n                    \"tie_break_selected\": (i, c) not in optimal_intersection}\n                   for i, t, c in sorted(best_edges)]\n    return {\n        \"uid\": payload[\"uid\"], \"method\": \"instance_round2_target_ranked_v3\",\n        \"payload\": payload, \"model_output\": output,\n        \"selected_instance_entities\": selected,\n        \"rejected_instance_entities\": rejected,\n        \"unresolved_instance_entities\": {\"1\": [], \"2\": []},\n        \"matching_audit\": {\n            \"canonical_target_ids\": [{\"image_index\": i, \"raw_id\": old, \"canonical_id\": new} for (i, old), new in renamed.items()],\n            \"target_capacity\": {str(i): len(targets[i]) for i in (1, 2)},\n            \"target_counts\": {str(i): len(targets[i]) for i in (1, 2)},\n            \"maximum_covered_targets\": best_objective[0],\n            \"selected_candidate_counts\": {str(i): sum(ii == i for ii, c in chosen_pairs) for i in (1, 2)},\n            \"matched_target_counts\": {str(i): sum(ii == i for ii, t, c in best_edges) for i in (1, 2)},\n            \"unmatched_targets\": [{\"image_index\": i, \"target_id\": t} for i, t in target_keys if not any(ii == i and tt == t for ii, tt, c in best_edges)],\n            \"rank_order\": [\"covered_target_count\"] + list(RANK_ORDER),\n            \"focal_feature_count_sources\": [\"differing_attributes\", \"candidate_known_attributes\"]\n            if any(image.get(\"candidate_known_attributes\") for image in images.values()) else [\"differing_attributes\"],\n            \"best_objective\": list(best_objective), \"optimal_matching_count\": optimal_count,\n            \"tie_break_rule\": \"lowest source entity IDs, then image index, then target ID; NOT identity proof\",\n            \"tie_break_selected_candidate_pairs\": sorted(chosen_pairs - optimal_intersection),\n            \"alternative_optimal_candidate_pairs\": sorted(optimal_union),\n            \"alternative_optimal_target_edges\": sorted(optimal_edge_union),\n            \"visited_nodes\": visited, \"enumeration_truncated\": False,\n            \"target_assignments\": assignments, \"edge_decisions\": edge_audit,\n        },\n    }\n"
+        },
+        {
+          "path": "r3/src/instance_family_equivalence.py",
+          "stage": "round2",
+          "role": "active_embedded_family_rules",
+          "sha256": "a2737efce7eacb54d195670a052c0732a63959fc601b55bef62d947d1c091eea",
+          "format": "py",
+          "content": "\"\"\"Report-only Instance equivalence for image-level family scoring.\n\nNever treats family membership as physical identity or unknown as a wildcard.\nSize is excluded because downstream size claims are permanently rejected.\n\"\"\"\nimport hashlib\nimport json\nfrom collections import defaultdict\n\nfrom .instance_round2_target_contrast import equivalent_text\nfrom .instance_round2_target_ranked import natural_id\n\nPOSITION_FIELDS = {\"anatomic_region\", \"neck_level\", \"location_detail\", \"laterality\", \"source_laterality\", \"source_side\", \"region\", \"location\", \"position\", \"side\"}\nMETADATA_FIELDS = {\"instance_id\", \"entity_type\", \"identity_certainty\", \"instance_role\", \"extra_attributes\", \"size\", \"group_focal_detail\"}\nUNKNOWN = {\"\", \"none\", \"unknown\", \"unspecified\", \"not specified\", \"null\"}\n\n\ndef normalized(value):\n    if value is None:\n        return None\n    if isinstance(value, (list, tuple)):\n        values = [normalized(v) for v in value]\n        return sorted((v for v in values if v is not None), key=lambda v: json.dumps(v, sort_keys=True)) or None\n    if isinstance(value, dict):\n        return {k: normalized(v) for k, v in sorted(value.items()) if normalized(v) is not None} or None\n    return None if str(value).strip().lower() in UNKNOWN else equivalent_text(value)\n\n\ndef family_signature(instance, candidate):\n    attributes = {k: normalized(v) for k, v in sorted(instance.items())\n                  if k not in POSITION_FIELDS | METADATA_FIELDS and normalized(v) is not None}\n    extras = set()\n    for row in instance.get(\"extra_attributes\", []):\n        name = str(row.get(\"attribute_name\", \"\")).strip().lower().replace(\" \", \"_\")\n        if not name or name in POSITION_FIELDS or name in {\"size\", \"group_focal_detail\"}:\n            continue\n        value = normalized(row.get(\"value\"))\n        if value is not None:\n            extras.add(json.dumps([name, value], sort_keys=True, ensure_ascii=False))\n    return {\"entity_type\": instance[\"entity_type\"],\n            \"compartment\": candidate[\"conditions\"][\"anatomy\"],\n            \"object_scope\": candidate[\"object_scope\"],\n            \"nonposition_attributes\": attributes,\n            \"nonposition_extra_attributes\": [json.loads(v) for v in sorted(extras)]}\n\n\ndef build_instance_families(report, payload):\n    instances = {i[\"instance_id\"]: i for i in report.get(\"instances\", [])}\n    candidate_by_entity = {e: c for c in payload[\"instance_candidates\"] for e in c[\"entity_ids\"]}\n    if set(instances) != set(candidate_by_entity):\n        raise ValueError(\"Instance family universe differs from source report\")\n    groups, signatures = defaultdict(list), {}\n    for entity, candidate in candidate_by_entity.items():\n        signature = family_signature(instances[entity], candidate)\n        rendered = json.dumps(signature, sort_keys=True, ensure_ascii=False, separators=(\",\", \":\"))\n        family = \"instance_family_\" + hashlib.sha256((str(payload[\"uid\"]) + \"|\" + rendered).encode()).hexdigest()[:16]\n        groups[family].append(entity)\n        signatures[family] = signature\n    mapping = {e: f for f, members in groups.items() for e in members}\n    families = [{\"family_id\": f, \"entity_ids\": sorted(members, key=natural_id), \"signature\": signatures[f]}\n                for f, members in sorted(groups.items())]\n    return {\"uid\": payload[\"uid\"], \"entity_to_family\": mapping, \"families\": families}\n\n\ndef annotate_selected_families(result, family_data):\n    \"\"\"Keep canonical source IDs, distinguish family support from member identity.\n\n    These are next-stage claim actions, NOT modifications of R1/gold claims.\n    \"\"\"\n    mapping = family_data[\"entity_to_family\"]\n    candidate_map = {c[\"candidate_key\"]: c for c in result[\"payload\"][\"instance_candidates\"]}\n    audit = result.get(\"matching_audit\", {})\n    pairs = {(int(p[\"image_index\"]), p[\"target_id\"], p[\"candidate_key\"]): p\n             for p in (result.get(\"model_output\") or {}).get(\"pair_assessments\", [])}\n    tied = {tuple(p) for p in audit.get(\"tie_break_selected_candidate_pairs\", [])}\n    alternatives = [tuple(p) for p in audit.get(\"alternative_optimal_candidate_pairs\", [])]\n    target_alternatives = audit.get(\"alternative_optimal_target_edges\")\n    decisions = {\"1\": [], \"2\": []}\n    for assignment in audit.get(\"target_assignments\", []):\n        i, t, c = assignment[\"image_index\"], assignment[\"target_id\"], assignment[\"candidate_key\"]\n        families = {mapping[e] for e in candidate_map[c][\"entity_ids\"]}\n        other = ([(j, key) for j, target, key in target_alternatives if j == i and target == t and key != c]\n                 if target_alternatives is not None else [(j, key) for j, key in alternatives if j == i and key != c])\n        same_family_alternatives = [key for j, key in other\n                                   if {mapping[e] for e in candidate_map[key][\"entity_ids\"]} == families]\n        other_family_alternatives = [key for j, key in other\n                                    if {mapping[e] for e in candidate_map[key][\"entity_ids\"]} != families]\n        pair = pairs[(i, t, c)]\n        conditions = candidate_map[c][\"conditions\"]\n        specific_side_region = conditions.get(\"anatomic_region\") in {\"left_lobe\", \"right_lobe\", \"left_neck\", \"right_neck\"}\n        actions = {\"source_laterality\": \"accept\" if normalized(conditions.get(\"source_laterality\")) is not None and pair[\"laterality_match\"] == \"yes\" else \"reject\",\n                   \"anatomic_region\": \"accept\" if normalized(conditions.get(\"anatomic_region\")) is not None and pair[\"anatomic_region_match\"] == \"yes\" and (not specific_side_region or pair[\"laterality_match\"] == \"yes\") else \"reject\",\n                   \"neck_level\": \"accept\" if normalized(conditions.get(\"neck_level\")) is not None and pair[\"neck_level_match\"] == \"yes\" else \"reject\",\n                   \"location_detail\": \"accept\" if normalized(conditions.get(\"location_detail\")) is not None and pair[\"location_detail_match\"] == \"yes\" else \"reject\",\n                   \"size\": \"reject\"}\n        decisions[str(i)].append({\"target_id\": t, \"candidate_key\": c,\n                                 \"selected_family_ids\": sorted(families),\n                                 \"selected_source_entity_ids\": candidate_map[c][\"entity_ids\"],\n                                 \"selection_basis\": \"family_equivalent_tie\" if (i, c) in tied and same_family_alternatives and not other_family_alternatives else \"forced_tie\" if (i, c) in tied else \"ranked_match\",\n                                 \"same_family_alternative_candidate_keys\": sorted(same_family_alternatives),\n                                 \"other_family_alternative_candidate_keys\": sorted(other_family_alternatives),\n                                 \"position_claim_actions\": actions,\n                                 \"same_object_proven_by_family\": False})\n    result[\"instance_family_mapping\"] = family_data\n    result[\"selected_instance_families\"] = {str(i): sorted({mapping[e] for e in result[\"selected_instance_entities\"][str(i)]}) for i in (1, 2)}\n    result[\"instance_family_decisions\"] = decisions\n    return result\n"
+        },
+        {
+          "path": "r3/schemas/instance_round2_ranked_known_family.schema.json",
+          "stage": "round2",
+          "role": "active_output_contract",
+          "sha256": "ecf62e267c63ca82be622b29fa73d64bc7262bf957c8aebfee8c992b42f7ae96",
+          "format": "json",
+          "content": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "$id": "instance_round2_ranked_known_family.schema.json",
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "uid",
+              "image_target_inventories",
+              "cross_image_target_relations",
+              "pair_assessments",
+              "case_summary"
+            ],
+            "properties": {
+              "uid": {
+                "type": "string"
+              },
+              "image_target_inventories": {
+                "type": "array",
+                "minItems": 2,
+                "maxItems": 2,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "image_index",
+                    "image_id",
+                    "target_present",
+                    "visible_targets",
+                    "inventory_evidence"
+                  ],
+                  "properties": {
+                    "image_index": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 2
+                    },
+                    "image_id": {
+                      "type": "string"
+                    },
+                    "target_present": {
+                      "enum": [
+                        "yes",
+                        "no"
+                      ]
+                    },
+                    "visible_targets": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "target_id",
+                          "bbox",
+                          "rule_answers",
+                          "visual_signature",
+                          "landmark_relation"
+                        ],
+                        "properties": {
+                          "target_id": {
+                            "type": "string"
+                          },
+                          "bbox": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "x_min",
+                              "y_min",
+                              "x_max",
+                              "y_max"
+                            ],
+                            "properties": {
+                              "x_min": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 1000
+                              },
+                              "y_min": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 1000
+                              },
+                              "x_max": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 1000
+                              },
+                              "y_max": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 1000
+                              }
+                            }
+                          },
+                          "rule_answers": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "T01_LOCALIZED_FOCUS",
+                              "T02_FINITE_EXTENT",
+                              "T03_NOT_LANDMARK_OR_ARTIFACT",
+                              "T04_DIRECT_TARGETING_CUE"
+                            ],
+                            "properties": {
+                              "T01_LOCALIZED_FOCUS": {
+                                "enum": [
+                                  "yes",
+                                  "no",
+                                  "not_sure"
+                                ]
+                              },
+                              "T02_FINITE_EXTENT": {
+                                "enum": [
+                                  "yes",
+                                  "no",
+                                  "not_sure"
+                                ]
+                              },
+                              "T03_NOT_LANDMARK_OR_ARTIFACT": {
+                                "enum": [
+                                  "yes",
+                                  "no",
+                                  "not_sure"
+                                ]
+                              },
+                              "T04_DIRECT_TARGETING_CUE": {
+                                "enum": [
+                                  "yes",
+                                  "no",
+                                  "not_sure"
+                                ]
+                              }
+                            }
+                          },
+                          "visual_signature": {
+                            "type": "string"
+                          },
+                          "landmark_relation": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "inventory_evidence": {
+                      "type": "string"
+                    }
+                  }
+                }
+              },
+              "cross_image_target_relations": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "image_1_target_id",
+                    "image_2_target_id",
+                    "relation",
+                    "evidence_features",
+                    "evidence"
+                  ],
+                  "properties": {
+                    "image_1_target_id": {
+                      "type": "string"
+                    },
+                    "image_2_target_id": {
+                      "type": "string"
+                    },
+                    "relation": {
+                      "enum": [
+                        "same_object",
+                        "different_objects",
+                        "uncertain"
+                      ]
+                    },
+                    "evidence_features": {
+                      "type": "array",
+                      "items": {
+                        "enum": [
+                          "target_morphology",
+                          "anatomic_landmark",
+                          "complementary_plane",
+                          "modality_relation",
+                          "location_context"
+                        ]
+                      }
+                    },
+                    "evidence": {
+                      "type": "string"
+                    }
+                  }
+                }
+              },
+              "pair_assessments": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "image_index",
+                    "target_id",
+                    "candidate_key",
+                    "laterality_match",
+                    "anatomic_region_match",
+                    "neck_level_match",
+                    "location_detail_match",
+                    "evidence",
+                    "attribute_checks"
+                  ],
+                  "properties": {
+                    "image_index": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 2
+                    },
+                    "target_id": {
+                      "type": "string"
+                    },
+                    "candidate_key": {
+                      "type": "string"
+                    },
+                    "laterality_match": {
+                      "enum": [
+                        "yes",
+                        "no",
+                        "not_sure",
+                        "not_applicable"
+                      ]
+                    },
+                    "anatomic_region_match": {
+                      "enum": [
+                        "yes",
+                        "no",
+                        "not_sure",
+                        "not_applicable"
+                      ]
+                    },
+                    "neck_level_match": {
+                      "enum": [
+                        "yes",
+                        "no",
+                        "not_sure",
+                        "not_applicable"
+                      ]
+                    },
+                    "location_detail_match": {
+                      "enum": [
+                        "yes",
+                        "no",
+                        "not_sure",
+                        "not_applicable"
+                      ]
+                    },
+                    "evidence": {
+                      "type": "string"
+                    },
+                    "attribute_checks": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "field",
+                          "answer",
+                          "evidence"
+                        ],
+                        "properties": {
+                          "field": {
+                            "type": "string"
+                          },
+                          "answer": {
+                            "enum": [
+                              "yes",
+                              "no",
+                              "not_sure",
+                              "not_applicable"
+                            ]
+                          },
+                          "evidence": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "case_summary": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "stage": "round3",
+      "assets": [
+        {
+          "path": "r3/round3/knowledge/claim_prefilter_v2.json",
+          "stage": "round3",
+          "role": "active_unchanged_core_profile",
+          "sha256": "abe72abcf7c38c1044bdb3b5e26eef14fbdc06679cc2abddc1cdaa8dfb87d1fe",
+          "format": "json",
+          "content": {
+            "version": "round3-claim-prefilter-v2",
+            "status": "approved_core_with_orientation_uncertainty_and_posterior_exclusion",
+            "rules": [
+              {
+                "id": "C01_SIZE_LIMIT",
+                "condition": "Instance size, or size-named claim with explicit dimensions/placeholders",
+                "reason": "dataset_measurement_evidence_incomplete"
+              },
+              {
+                "id": "C02_NO_DOPPLER",
+                "condition": "Flow/vascularity claim and modality != color_doppler",
+                "reason": "doppler_required_for_flow_claim"
+              },
+              {
+                "id": "C03_LATERALITY_UNKNOWN",
+                "condition": "laterality/source_laterality and no known image laterality",
+                "reason": "image_laterality_unknown"
+              },
+              {
+                "id": "C04_SIDED_ANATOMY_UNKNOWN",
+                "condition": "Sided or midline anatomic_region and no known image laterality",
+                "reason": "sided_region_requires_known_image_laterality"
+              },
+              {
+                "id": "C05_NECK_LEVEL_UNAVAILABLE",
+                "condition": "neck_level without established level evidence",
+                "reason": "neck_level_evidence_unavailable"
+              },
+              {
+                "id": "C06_NON_VISUAL_CONTEXT",
+                "condition": "Fixed clinical/examination-context attribute list",
+                "reason": "non_visual_context_attribute"
+              },
+              {
+                "id": "C07_ELASTOGRAPHY_REQUIRED",
+                "condition": "Elastography attribute without elastography modality",
+                "reason": "elastography_image_required"
+              },
+              {
+                "id": "C08_ORIENTATION_PLANE",
+                "condition": "orientation and plane != transverse",
+                "reason": "orientation_requires_transverse_plane"
+              },
+              {
+                "id": "C18_POSTERIOR_ACOUSTIC_FEATURE",
+                "condition": "attribute_name == posterior_acoustic_feature, for every entity and image",
+                "reason": "posterior_acoustic_feature_excluded_by_project_policy",
+                "basis": "Explicit user decision on 2026-10-07; not a universal clinical visibility rule"
+              }
+            ],
+            "unit": "single image x selected entity x unchanged non-none claim",
+            "default_profile": "core_v2",
+            "orientation_minimum_plane_confidence": 0.8,
+            "additional_rules": [
+              {
+                "id": "C16_ORIENTATION_UNCERTAIN_PLANE",
+                "condition": "orientation and plane confidence <0.8 or needs_review is not false",
+                "reason": "orientation_requires_trusted_transverse_plane"
+              },
+              {
+                "id": "C17_ORIENTATION_RATIO_PLACEHOLDER",
+                "condition": "orientation contains _r_",
+                "reason": "orientation_ratio_value_unavailable",
+                "status": "optional_not_enabled_by_default"
+              }
+            ],
+            "profiles": {
+              "core_v2": [
+                "C01_SIZE_LIMIT",
+                "C02_NO_DOPPLER",
+                "C03_LATERALITY_UNKNOWN",
+                "C04_SIDED_ANATOMY_UNKNOWN",
+                "C05_NECK_LEVEL_UNAVAILABLE",
+                "C06_NON_VISUAL_CONTEXT",
+                "C07_ELASTOGRAPHY_REQUIRED",
+                "C08_ORIENTATION_PLANE",
+                "C16_ORIENTATION_UNCERTAIN_PLANE",
+                "C18_POSTERIOR_ACOUSTIC_FEATURE"
+              ],
+              "core_v2_ratio": [
+                "C01_SIZE_LIMIT",
+                "C02_NO_DOPPLER",
+                "C03_LATERALITY_UNKNOWN",
+                "C04_SIDED_ANATOMY_UNKNOWN",
+                "C05_NECK_LEVEL_UNAVAILABLE",
+                "C06_NON_VISUAL_CONTEXT",
+                "C07_ELASTOGRAPHY_REQUIRED",
+                "C08_ORIENTATION_PLANE",
+                "C16_ORIENTATION_UNCERTAIN_PLANE",
+                "C17_ORIENTATION_RATIO_PLACEHOLDER",
+                "C18_POSTERIOR_ACOUSTIC_FEATURE"
+              ]
+            },
+            "review_excluded_attributes": [
+              "group_focal_detail"
+            ],
+            "review_exclusion_reason": "Matches the previously established human review scope; preserve original value in excluded-review audit, never silently discard report content.",
+            "upstream_policy": "Preserve explicit Round1/2 claim rejection or unresolved representative position; never overwrite reject with defer.",
+            "semantics": {
+              "reject": "Whole unchanged claim is excluded with rule ID and reason.",
+              "defer": "Requires later visual grounding; not accept.",
+              "pending_upstream": "Instance routing has not completed; no empty or absent-instance conclusion."
+            },
+            "non_rules": [
+              "No entity deletion",
+              "No anatomy-unknown appearance veto",
+              "No blanket qualitative Region size rejection",
+              "No blanket negative summary rejection",
+              "No UID or gold-label exceptions",
+              "No laterality-unknown orientation gate"
+            ]
+          }
+        },
+        {
+          "path": "r3/round3/knowledge/claim_filter_policy.json",
+          "stage": "round3",
+          "role": "active_accept_after_prefilter_policy",
+          "sha256": "cb2d6532c020b9a1502866aa98ecbf13cf0c74c733a690b95ea36170e29dc3c5",
+          "format": "json",
+          "content": {
+            "version": "round3-prefilter-only-accept-reject-20261009",
+            "prefilter_config": "claim_prefilter_v2.json",
+            "profile": "core_v2",
+            "acceptance_basis": "project_policy_retained_after_prefilter",
+            "non_hit_decision": "accept",
+            "reject_precedence": "Any enabled core rejection or upstream position rejection wins.",
+            "accept_semantics": "Retained by project policy after deterministic exclusion, NOT independently visually verified.",
+            "visual_claim_verification_performed": false,
+            "new_model_calls": 0,
+            "none_policy": "Do not turn none/unknown into positive claims. Preserve all original values in audit/source; rejected fields are omitted from the filtered view, not rewritten to none.",
+            "review_exclusion_policy": "group_focal_detail stays outside the review/filtered view, with its original value retained in excluded audit and source routing.",
+            "pending_upstream_policy": "Process available Region claims but keep missing Instance routing null; never fabricate an empty list, a completed case or absent-instance evidence.",
+            "unchanged_rules": [
+              "C01_SIZE_LIMIT",
+              "C02_NO_DOPPLER",
+              "C03_LATERALITY_UNKNOWN",
+              "C04_SIDED_ANATOMY_UNKNOWN",
+              "C05_NECK_LEVEL_UNAVAILABLE",
+              "C06_NON_VISUAL_CONTEXT",
+              "C07_ELASTOGRAPHY_REQUIRED",
+              "C08_ORIENTATION_PLANE",
+              "C16_ORIENTATION_UNCERTAIN_PLANE",
+              "C18_POSTERIOR_ACOUSTIC_FEATURE"
+            ],
+            "upstream_rules": [
+              "U01_REGION_MEMBER_POSITION_UNRESOLVED",
+              "U02_ROUND2_CLAIM_REJECT"
+            ],
+            "optional_disabled": [
+              "C17_ORIENTATION_RATIO_PLACEHOLDER"
+            ],
+            "non_rules": [
+              "No new focal-summary/appearance gates",
+              "No unconditional qualitative gland-size rejection",
+              "No new thickness or measurement gate",
+              "No entity removal",
+              "No gold-dependent exceptions",
+              "No model-based claim checks"
+            ]
+          }
+        },
+        {
+          "path": "r3/round3/prefilter.py",
+          "stage": "round3",
+          "role": "active_deterministic_rule_implementation",
+          "sha256": "ce7bc9c9ad3b8d201bb7983aa0f82111fe8b62c39b3da2d11aaa8234b5d925a4",
+          "format": "py",
+          "content": "\"\"\"Approved claim-only rules. No gold labels, images or network access.\"\"\"\nimport math\nimport re\n\nfrom .common import NONE\n\nSIZE_RE = re.compile(r\"_[23]DS_|<[^>]*size[^>]*>|\\d+(?:\\.\\d+)?\\s*(?:mm|cm)\\b\", re.I)\nFLOW_RE = re.compile(r\"\\bCDFI\\b|\\bDoppler\\b|blood\\s*flow|vascularity|血流\", re.I)\nNON_VISUAL = {\"examination_context\", \"examination_limitation\", \"examination_setting\",\n              \"scanning_limitation\", \"patient_position\", \"patient_indicated_site\",\n              \"patient_indicated_area\", \"result_limitation\", \"palpability\"}\n\n\ndef values(card, field):\n    axis = card.get(field, \"unknown\")\n    raw = axis.get(\"values\", [axis.get(\"value\", \"unknown\")]) if isinstance(axis, dict) else axis\n    raw = raw if isinstance(raw, (list, tuple, set)) else [raw]\n    return {str(v) for v in raw if str(v or \"\").strip().lower() not in NONE}\n\n\ndef single(card, field):\n    axis = card.get(field, \"unknown\")\n    return str(axis.get(\"value\", \"unknown\")) if isinstance(axis, dict) else str(axis)\n\n\ndef sides(value):\n    text, result = str(value), set()\n    if re.search(r\"(?<![a-z])left(?![a-z])|左\", text, re.I):\n        result.add(\"left\")\n    if re.search(r\"(?<![a-z])right(?![a-z])|右\", text, re.I):\n        result.add(\"right\")\n    if re.search(r\"\\bbilateral\\b|\\bboth\\b|雙側|双侧\", text, re.I):\n        result.update((\"left\", \"right\"))\n    if re.search(r\"\\bmidline\\b|\\bisthmus\\b|中線|中线|峡部|峽部\", text, re.I):\n        result.add(\"midline\")\n    return result\n\nREASONS = {\n    \"C01_SIZE_LIMIT\": \"dataset_measurement_evidence_incomplete\",\n    \"C02_NO_DOPPLER\": \"doppler_required_for_flow_claim\",\n    \"C03_LATERALITY_UNKNOWN\": \"image_laterality_unknown\",\n    \"C04_SIDED_ANATOMY_UNKNOWN\": \"sided_region_requires_known_image_laterality\",\n    \"C05_NECK_LEVEL_UNAVAILABLE\": \"neck_level_evidence_unavailable\",\n    \"C06_NON_VISUAL_CONTEXT\": \"non_visual_context_attribute\",\n    \"C07_ELASTOGRAPHY_REQUIRED\": \"elastography_image_required\",\n    \"C08_ORIENTATION_PLANE\": \"orientation_requires_transverse_plane\",\n    \"C16_ORIENTATION_UNCERTAIN_PLANE\": \"orientation_requires_trusted_plane\",\n    \"C17_ORIENTATION_RATIO_PLACEHOLDER\": \"orientation_ratio_value_unavailable\",\n    \"C18_POSTERIOR_ACOUSTIC_FEATURE\": \"posterior_acoustic_feature_excluded_by_project_policy\",\n}\n\n\ndef hits(claim, card, *, minimum_plane_confidence=.8, established_neck_level=False):\n    attr, text = claim[\"attribute_name\"], str(claim[\"value\"])\n    side_set = values(card, \"laterality\")\n    vascular = attr in {\"vascularity\", \"internal_vascularity\", \"peripheral_vascularity\", \"blood_flow\"}\n    vascular = vascular or (claim.get(\"source\") == \"extra_attribute\" and bool(FLOW_RE.search(text)))\n    conditions = {\n        \"C01_SIZE_LIMIT\": (attr == \"size\" and claim[\"entity_kind\"] == \"instance\") or\n                          ((attr == \"size\" or attr.endswith(\"_size\")) and bool(SIZE_RE.search(text))),\n        \"C02_NO_DOPPLER\": vascular and single(card, \"modality\") != \"color_doppler\",\n        \"C03_LATERALITY_UNKNOWN\": attr in {\"laterality\", \"source_laterality\"} and not side_set,\n        \"C04_SIDED_ANATOMY_UNKNOWN\": attr == \"anatomic_region\" and bool(sides(text)) and not side_set,\n        \"C05_NECK_LEVEL_UNAVAILABLE\": attr == \"neck_level\" and not established_neck_level,\n        \"C06_NON_VISUAL_CONTEXT\": attr in NON_VISUAL,\n        \"C07_ELASTOGRAPHY_REQUIRED\": \"elastograph\" in attr and single(card, \"modality\") != \"elastography\",\n        \"C08_ORIENTATION_PLANE\": attr == \"orientation\" and single(card, \"plane\") != \"transverse\",\n        # Explicit dataset policy, not a claim that the feature is never visible.\n        \"C18_POSTERIOR_ACOUSTIC_FEATURE\": attr == \"posterior_acoustic_feature\",\n    }\n    result = [name for name, applies in conditions.items() if applies]\n    if claim[\"attribute_name\"] == \"orientation\":\n        plane = card.get(\"plane\", {})\n        try:\n            confidence = float(plane.get(\"confidence\", 0)) if isinstance(plane, dict) else 0.\n        except (TypeError, ValueError):\n            confidence = 0.\n        reviewed = isinstance(plane, dict) and plane.get(\"needs_review\") is False\n        if not math.isfinite(confidence) or confidence < minimum_plane_confidence or not reviewed:\n            result.append(\"C16_ORIENTATION_UNCERTAIN_PLANE\")\n        if \"_r_\" in str(claim[\"value\"]).lower():\n            result.append(\"C17_ORIENTATION_RATIO_PLACEHOLDER\")\n    return result\n\n\ndef decide(claim, card, rule_ids, **kwargs):\n    if set(rule_ids) - REASONS.keys():\n        raise ValueError(\"Unsupported rules in approved profile\")\n    matching = set(hits(claim, card, **kwargs))\n    applied = [r for r in rule_ids if r in matching]\n    return {\"decision\": \"reject\" if applied else \"defer\", \"rule_ids\": applied,\n            \"reasons\": [REASONS[r] for r in applied] or [\"requires_visual_claim_grounding\"]}\n"
+        },
+        {
+          "path": "r3/round3/claims.py",
+          "stage": "round3",
+          "role": "active_expansion_and_upstream_constraints",
+          "sha256": "ef7de4d5ba8a121153ecca9d6c217425dedf880a4f21ef30f3c91adf0866b8e8",
+          "format": "py",
+          "content": "\"\"\"Claim expansion and upstream restrictions ported unchanged from main_code.\"\"\"\nfrom collections import Counter\nimport json\nfrom .common import NONE\n\nMETADATA = {\"region_id\", \"instance_id\", \"entity_type\", \"identity_certainty\", \"instance_role\", \"extra_attributes\"}\nPOSITION = {\"anatomic_region\", \"neck_level\", \"location_detail\", \"source_laterality\", \"laterality\", \"region\", \"site\"}\n\n\ndef present(value):\n    return value is not None and not (isinstance(value, str) and value.strip().lower() in NONE) and value not in ([], {})\n\n\ndef expand_claims(entity, kind, excluded_attributes=()):\n    \"\"\"Keep raw values; deduplicate exact attribute/value pairs like expert forms.\n\n    Claim IDs match expert forms. No source_laterality skip. Review exclusions\n    remain visible in a separate audit, with originals still in source entities.\n    \"\"\"\n    entity_id = entity[\"region_id\" if kind == \"region\" else \"instance_id\"]\n    rows, excluded, seen, counts = [], [], set(), Counter()\n    for name, value in entity.items():\n        if name in METADATA or not present(value):\n            continue\n        if not isinstance(value, (str, int, float, bool)):\n            raise ValueError(f\"Unsupported compound direct attribute {entity_id}/{name}\")\n        row = {\"claim_id\": f\"{entity_id}:{name}\", \"entity_id\": entity_id, \"entity_kind\": kind,\n               \"entity_type\": entity[\"entity_type\"], \"attribute_name\": name, \"value\": value,\n               \"source\": \"routing_metadata\" if name in {\"anatomic_region\", \"neck_level\"} else \"direct\",\n               \"source_pointer\": f\"/{name}\"}\n        seen.add((name, json.dumps(value, ensure_ascii=False, sort_keys=True)))\n        (excluded if name in excluded_attributes else rows).append(row)\n    for index, extra in enumerate(entity.get(\"extra_attributes\", []) or []):\n        if not isinstance(extra, dict):\n            raise ValueError(f\"Invalid extra attribute {entity_id}/{index}\")\n        name = str(extra.get(\"attribute_name\", extra.get(\"name\")) or \"unnamed\")\n        value = extra.get(\"value\")\n        if not present(value):\n            continue\n        key = name, json.dumps(value, ensure_ascii=False, sort_keys=True)\n        if key in seen:\n            continue\n        seen.add(key); counts[name] += 1\n        row = {\"claim_id\": f\"{entity_id}:extra:{name}:{counts[name]}\", \"entity_id\": entity_id,\n               \"entity_kind\": kind, \"entity_type\": entity[\"entity_type\"], \"attribute_name\": name,\n               \"value\": value, \"source\": \"extra_attribute\", \"source_pointer\": f\"/extra_attributes/{index}/value\"}\n        (excluded if name in excluded_attributes else rows).append(row)\n    return rows, excluded\n\n\ndef upstream_reject_reasons(image, claim):\n    reasons = []\n    if claim[\"entity_kind\"] == \"instance\":\n        for d in image.get(\"instance_family_decisions\") or []:\n            if claim[\"entity_id\"] in d.get(\"selected_source_entity_ids\", []):\n                if d.get(\"position_claim_actions\", {}).get(claim[\"attribute_name\"]) == \"reject\":\n                    reasons.append({\"rule_id\": \"U02_ROUND2_CLAIM_REJECT\", \"reason\": \"preserve_round2_position_claim_action\",\n                                    \"target_id\": d.get(\"target_id\"), \"candidate_key\": d.get(\"candidate_key\")})\n    elif claim[\"attribute_name\"] in POSITION:\n        for d in image.get(\"region_collapse_audit\", []):\n            if (int(d[\"image_index\"]) == int(image[\"image_index\"]) and\n                d.get(\"member_resolution\") == \"unresolved_representative\" and\n                claim[\"entity_id\"] in d.get(\"selected_members_after\", [])):\n                reasons.append({\"rule_id\": \"U01_REGION_MEMBER_POSITION_UNRESOLVED\",\n                                \"reason\": \"representative_id_does_not_establish_member_location\",\n                                \"collapse_family_id\": d.get(\"collapse_family_id\")})\n    return reasons\n"
+        },
+        {
+          "path": "r3/round3/filtering.py",
+          "stage": "round3",
+          "role": "active_binary_filtering_and_sparse_export",
+          "sha256": "3d230dda929a1e9997d2c7618ddc232c32b80012f800861d18dff5b4f26438e3",
+          "format": "py",
+          "content": "\"\"\"Apply frozen prefilter + upstream restrictions, retain every other claim.\"\"\"\nfrom collections import Counter\nimport copy\n\nfrom .claims import expand_claims, upstream_reject_reasons\nfrom .prefilter import decide\n\n\ndef process_image(image, card, config, policy):\n    if (str(image[\"uid\"]), int(image[\"image_index\"]), image[\"image_id\"]) != (\n            str(card[\"uid\"]), int(card[\"image_index\"]), card[\"image_id\"]):\n        raise ValueError(\"Image/card identity mismatch\")\n    profile = policy[\"profile\"]\n    if config[\"profiles\"][profile] != policy[\"unchanged_rules\"]:\n        raise ValueError(\"Frozen prefilter profile differs from declared policy\")\n    result = {\"uid\": str(image[\"uid\"]), \"image_index\": int(image[\"image_index\"]),\n              \"image_id\": image[\"image_id\"], \"image_card\": copy.deepcopy(card),\n              \"source_routing\": copy.deepcopy(image), \"entity_claims\": [],\n              \"excluded_review_claims\": [], \"claim_filter_policy\": policy[\"version\"],\n              \"profile\": profile, \"acceptance_basis\": policy[\"acceptance_basis\"],\n              \"visual_claim_verification_performed\": False,\n              \"claim_visibility_filtered\": True,\n              \"instance_routing_status\": image[\"instance_routing_status\"]}\n    pending = image.get(\"instances\") is None\n    if pending != (image[\"instance_routing_status\"] != \"complete\"):\n        raise ValueError(\"Instance status and null collection disagree\")\n    result[\"claim_filtering_status\"] = \"partial_upstream\" if pending else \"complete\"\n    filtered = copy.deepcopy(image)\n    for kind, collection, id_key in ((\"region\", \"regions\", \"region_id\"),\n                                    (\"instance\", \"instances\", \"instance_id\")):\n        selected = image.get(f\"selected_{kind}_ids\")\n        entities = image.get(collection)\n        if kind == \"instance\" and pending:\n            if selected is not None:\n                raise ValueError(\"Missing upstream Instance selection must stay null\")\n            continue\n        if entities is None or selected is None:\n            raise ValueError(\"Missing Region routing or selected IDs\")\n        if len(set(selected)) != len(selected) or sorted(e[id_key] for e in entities) != sorted(selected):\n            raise ValueError(\"Selected IDs do not match source entity list\")\n        final_entities = []\n        for entity in entities:\n            claims, excluded = expand_claims(entity, kind, config[\"review_excluded_attributes\"])\n            for row in excluded:\n                result[\"excluded_review_claims\"].append({**row, \"decision\": \"excluded_review_scope\",\n                                                       \"reason\": config[\"review_exclusion_reason\"]})\n            evaluated = []\n            for claim in claims:\n                operational = decide(claim, card, config[\"profiles\"][profile],\n                                     minimum_plane_confidence=config[\"orientation_minimum_plane_confidence\"])\n                upstream = upstream_reject_reasons(image, claim)\n                if upstream:\n                    operational[\"decision\"] = \"reject\"\n                    operational[\"rule_ids\"] += list(dict.fromkeys(r[\"rule_id\"] for r in upstream))\n                    operational[\"reasons\"] = [r for r in operational[\"reasons\"]\n                                              if r != \"requires_visual_claim_grounding\"]\n                    operational[\"reasons\"] += list(dict.fromkeys(r[\"reason\"] for r in upstream))\n                elif operational[\"decision\"] == \"defer\":\n                    operational.update(decision=\"accept\", reasons=[\"no_enabled_rejection_rule_applies\"])\n                evaluated.append({**claim, **operational, \"upstream_evidence\": upstream,\n                                  \"decision_basis\": \"hard_rejection_rule\" if operational[\"decision\"] == \"reject\"\n                                  else policy[\"acceptance_basis\"]})\n            result[\"entity_claims\"].append({\"entity_id\": entity[id_key], \"entity_kind\": kind,\n                                            \"entity_type\": entity[\"entity_type\"], \"claims\": evaluated})\n            # Sparse accepted-claim view; never rewrite rejected source text or fake none.\n            final_entity = copy.deepcopy(entity)\n            omitted = [c for c in evaluated if c[\"decision\"] == \"reject\"] + excluded\n            removed_extra = set()\n            for row in omitted:\n                pointer = row[\"source_pointer\"]\n                if row[\"source\"] == \"extra_attribute\":\n                    removed_extra.add(int(pointer.split(\"/\")[2]))\n                else:\n                    final_entity.pop(row[\"attribute_name\"], None)\n            # expand_claims deduplicates exact values: apply exclusion to all copies.\n            rejected_extra_values = {(r[\"attribute_name\"], str(r[\"value\"])) for r in omitted}\n            final_entity[\"extra_attributes\"] = [copy.deepcopy(extra) for i, extra in\n                enumerate(entity.get(\"extra_attributes\", []) or [])\n                if i not in removed_extra and\n                (str(extra.get(\"attribute_name\", extra.get(\"name\")) or \"unnamed\"),\n                 str(extra.get(\"value\"))) not in rejected_extra_values]\n            final_entities.append(final_entity)\n        filtered[collection] = final_entities\n    result[\"counts\"] = dict(Counter(c[\"decision\"] for g in result[\"entity_claims\"] for c in g[\"claims\"]))\n    filtered.update(claim_visibility_filtered=True, claim_filter_policy=policy[\"version\"],\n                    claim_filtering_status=result[\"claim_filtering_status\"],\n                    acceptance_basis=policy[\"acceptance_basis\"], visual_claim_verification_performed=False)\n    return result, filtered\n"
+        }
+      ]
+    },
+    {
+      "stage": "position_split",
+      "assets": [
+        {
+          "path": "r3/position_split/knowledge/position_components.json",
+          "stage": "position_split",
+          "role": "active_independent_anatomy_laterality_rules",
+          "sha256": "69c76d44f9fff675763723aa96843f8f6277eee7bb18b467bc1d84b35f92381f",
+          "format": "json",
+          "content": {
+            "version": "position-components-v1",
+            "mapping": {
+              "left_lobe": [
+                "lobe",
+                "left"
+              ],
+              "right_lobe": [
+                "lobe",
+                "right"
+              ],
+              "isthmus": [
+                "isthmus",
+                "none"
+              ],
+              "left_neck": [
+                "neck",
+                "left"
+              ],
+              "right_neck": [
+                "neck",
+                "right"
+              ]
+            },
+            "card_anatomy": {
+              "lobe": "thyroid",
+              "isthmus": "thyroid",
+              "neck": "neck"
+            },
+            "rules": {
+              "P01": "Missing report position stays none; never infer it from card or entity_type.",
+              "P02": "Unknown/missing image-card anatomy rejects only anatomy.",
+              "P03": "Known card anatomy excluding the source compartment rejects only anatomy.",
+              "P04": "Unknown/missing image-card laterality rejects only laterality.",
+              "P05": "Known card laterality excluding the source side rejects only laterality.",
+              "P06": "Isthmus anatomy is independent of side; left/right laterality is not_applicable and represented by none."
+            },
+            "confidence_policy": "Use non-unknown predicted value sets; no new confidence threshold or plane gate is introduced.",
+            "prior_combined_position_policy": "Re-evaluate ONLY the two components of direct anatomic_region, superseding its old combined C04/U01/U02 decision. Those original decisions remain in position audit; all other claims/actions are preserved verbatim.",
+            "semantics": "Card compatibility is a retention policy, not new image/target identity evidence. Original report components only; anatomy/laterality stay scalar even when a card is multi-select.",
+            "non_rules": [
+              "No changes to entity selection",
+              "No recovery of other rejected fields",
+              "No source_laterality benchmark",
+              "No extra attribute parsing",
+              "No Instance merging",
+              "No raw-report or image inference"
+            ]
+          }
+        },
+        {
+          "path": "r3/position_split/transform.py",
+          "stage": "position_split",
+          "role": "active_conversion_nonposition_preservation",
+          "sha256": "cf3ba58c621a56ba699c97bb4cd774cf2d0e904209f88c12dabf2dbf2f0ab2b2",
+          "format": "py",
+          "content": "\"\"\"Split original combined position; preserve every non-position Round3 value.\"\"\"\nimport copy\n\nfrom ..round3.claims import present\nfrom ..round3.prefilter import values\n\n\ndef components(raw, config):\n    if not present(raw):\n        return 'none', 'none'\n    value = str(raw).strip().lower()\n    if value not in config['mapping']:\n        raise ValueError('Unsupported scalar anatomic_region: ' + value)\n    return tuple(config['mapping'][value])\n\n\ndef decision(field, value, card, config):\n    if value == 'none':\n        return 'reject', 'P01', 'source_component_unspecified_or_not_applicable'\n    prediction = values(card, 'anatomic_region' if field == 'anatomy' else 'laterality')\n    required = config['card_anatomy'][value] if field == 'anatomy' else value\n    if not prediction:\n        return 'reject', 'P02' if field == 'anatomy' else 'P04', 'image_' + field + '_unknown'\n    if required not in prediction:\n        return 'reject', 'P03' if field == 'anatomy' else 'P05', 'image_' + field + '_conflict'\n    return 'accept', 'P_COMPATIBLE', 'source_component_compatible_with_card'\n\n\ndef without_position(entity):\n    return {k: v for k, v in entity.items() if k not in {'anatomic_region', 'anatomy', 'laterality'}}\n\n\ndef process_image(original_decisions, original_filtered, config):\n    for key in ('uid', 'image_id', 'image_index'):\n        if original_decisions[key] != original_filtered[key]:\n            raise ValueError('Round3 identities differ')\n    decisions, filtered = copy.deepcopy(original_decisions), copy.deepcopy(original_filtered)\n    source, card = decisions['source_routing'], decisions['image_card']\n    groups = {(g['entity_kind'], g['entity_id']): g for g in decisions['entity_claims']}\n    audits = []\n    for kind, collection, id_key in [('region', 'regions', 'region_id'), ('instance', 'instances', 'instance_id')]:\n        if source[collection] is None:\n            assert filtered[collection] is None\n            continue\n        outputs = {e[id_key]: e for e in filtered[collection]}\n        for entity in source[collection]:\n            entity_id = entity[id_key]\n            if 'anatomy' in entity or 'laterality' in entity:\n                raise ValueError('Input must be original combined-position schema')\n            original_entity = copy.deepcopy(entity)\n            final = outputs[entity_id]\n            before = copy.deepcopy(final)\n            group = groups[kind, entity_id]\n            old_claims = [c for c in group['claims'] if c['attribute_name'] == 'anatomic_region' and c['source'] != 'extra_attribute']\n            unchanged_claims = [c for c in group['claims'] if c not in old_claims]\n            group['claims'] = unchanged_claims[:]\n            raw = entity.pop('anatomic_region', 'none')\n            final.pop('anatomic_region', None)\n            anatomy, side = components(raw, config)\n            new_claims = []\n            for field, value in [('anatomy', anatomy), ('laterality', side)]:\n                accept, rule, reason = decision(field, value, card, config)\n                if anatomy == 'isthmus' and field == 'laterality':\n                    rule, reason = 'P06', 'isthmus_has_no_left_right_component'\n                entity[field] = value\n                final[field] = value if accept == 'accept' else 'none'\n                claim = {'claim_id': entity_id + ':' + field, 'entity_id': entity_id,\n                         'entity_kind': kind, 'entity_type': entity['entity_type'],\n                         'attribute_name': field, 'value': value, 'source': 'routing_metadata',\n                         'source_pointer': '/' + field, 'decision': accept, 'rule_ids': [rule],\n                         'reasons': [reason], 'decision_basis': config['version'], 'upstream_evidence': []}\n                group['claims'].append(claim)\n                new_claims.append(claim)\n            assert without_position(before) == without_position(final)\n            assert without_position(original_entity) == without_position(entity)\n            assert [c for c in group['claims'] if c['attribute_name'] not in {'anatomy', 'laterality'}] == unchanged_claims\n            audits.append({'uid': str(filtered['uid']), 'image_id': filtered['image_id'], 'image_index': filtered['image_index'],\n                           'entity_kind': kind, 'entity_id': entity_id, 'entity_type': entity['entity_type'],\n                           'original_anatomic_region': raw, 'original_combined_claims': old_claims,\n                           'component_claims': new_claims,\n                           'image_card_anatomy': sorted(values(card, 'anatomic_region')),\n                           'image_card_laterality': sorted(values(card, 'laterality'))})\n    decisions['position_split_policy'] = filtered['position_split_policy'] = config['version']\n    decisions['counts'] = {d: sum(c['decision'] == d for g in decisions['entity_claims'] for c in g['claims']) for d in ('accept', 'reject')}\n    return decisions, filtered, audits\n"
+        }
+      ]
+    },
+    {
+      "stage": "round4",
+      "assets": [
+        {
+          "path": "r3/round4/knowledge/region_normalization.json",
+          "stage": "round4",
+          "role": "active_strict_equivalence_and_sideword_rules",
+          "sha256": "0b13b4e837b51be52c3c32a445e0620b603a5912cbe25c6020d45bf9cbd7eb66",
+          "format": "json",
+          "content": {
+            "version": "round4-strict-region-equivalence-position-components-v2",
+            "none_value": "none",
+            "none_is_wildcard": false,
+            "merge_unit": "All clinical attributes of a Region, including entity_type and every retained position; exclude only local IDs and source provenance.",
+            "image_then_case": true,
+            "same_known_position_can_merge": true,
+            "different_known_position_cannot_merge": true,
+            "instances_merge": false,
+            "instance_values_modified": false,
+            "semantic_method": "Deterministic exact clause equality plus this finite whole-clause alias table. Unknown paraphrases stay distinct; no model, embeddings or fuzzy similarity.",
+            "core_fields": {
+              "gland_region": [
+                "anatomy",
+                "laterality",
+                "size",
+                "shape",
+                "postoperative_status",
+                "echogenicity",
+                "echotexture",
+                "focal_finding_summary",
+                "vascularity"
+              ],
+              "neck_region": [
+                "anatomy",
+                "laterality",
+                "neck_level",
+                "focal_finding_summary"
+              ],
+              "isthmus_region": [
+                "anatomy",
+                "laterality",
+                "thickness",
+                "morphology",
+                "postoperative_status",
+                "echogenicity",
+                "echotexture",
+                "focal_finding_summary",
+                "vascularity"
+              ]
+            },
+            "side_words": [
+              "left",
+              "right",
+              "bilateral",
+              "bilaterally"
+            ],
+            "chinese_side_words": [
+              "左側",
+              "右側",
+              "左侧",
+              "右侧",
+              "雙側",
+              "双侧",
+              "左右",
+              "左",
+              "右"
+            ],
+            "contextual_both": "Remove only the word both immediately before lobes, thyroid lobes, or sides; keep all remaining words. Never remove both from both cystic and solid.",
+            "side_removal_scope": "Accepted non-position Region values only; not IDs, entity_type, accepted position fields, Instance values or source audit/evidence.",
+            "position_fields": [
+              "anatomic_region",
+              "neck_level",
+              "location_detail",
+              "source_laterality",
+              "laterality",
+              "region",
+              "site",
+              "anatomy"
+            ],
+            "provenance_policy": "Keep original raw entity, claim values, reject reasons and source-image/region bindings in audit, not in training-target attributes. Extra-attribute evidence is provenance, not a compared clinical value.",
+            "aliases": {
+              "size": [
+                [
+                  "normal",
+                  "normal size",
+                  "normal in size",
+                  "the thyroid gland is normal in size",
+                  "the gland is normal in size",
+                  "the thyroid is normal in size"
+                ]
+              ],
+              "shape": [
+                [
+                  "normal morphology",
+                  "normal shape",
+                  "normal in morphology",
+                  "the thyroid gland has normal morphology",
+                  "the thyroid gland is normal in morphology",
+                  "the gland has normal morphology",
+                  "the gland is normal in morphology",
+                  "the thyroid gland is normal in shape"
+                ]
+              ],
+              "morphology": [
+                [
+                  "normal morphology",
+                  "normal shape",
+                  "normal in morphology",
+                  "the isthmus has normal morphology",
+                  "the isthmus is normal in morphology"
+                ]
+              ],
+              "echotexture": [
+                [
+                  "homogeneous",
+                  "homogeneous echotexture",
+                  "the glandular echotexture is homogeneous",
+                  "the gland has homogeneous echotexture"
+                ],
+                [
+                  "heterogeneous",
+                  "heterogeneous echotexture",
+                  "the glandular echotexture is heterogeneous",
+                  "the gland has heterogeneous echotexture"
+                ],
+                [
+                  "coarse",
+                  "coarse echotexture",
+                  "the glandular echotexture is coarse",
+                  "the gland has coarse echotexture"
+                ]
+              ]
+            },
+            "non_rules": [
+              "No union of complementary attributes",
+              "No none-to-known completion",
+              "No partial-field family collapse",
+              "No count/polarity/degree normalization",
+              "No removal of upper/lower/pole/level words",
+              "No cross-entity-type Region merge",
+              "No Instance content or physical-object deduplication"
+            ],
+            "position_input_policy": "Consume independently filtered anatomy/laterality from position_split; no combined-position restoration. Preserve all existing nonposition normalization/merge rules."
+          }
+        },
+        {
+          "path": "r3/round4/normalization.py",
+          "stage": "round4",
+          "role": "active_conservative_semantics_and_full_signature",
+          "sha256": "c56b9e7c00deef691782bb0a0fbb573596df59e04a31376d8e878b39712688e2",
+          "format": "py",
+          "content": "\"\"\"Conservative lexical normalization and exact full-attribute Region signatures.\"\"\"\nimport copy\nimport hashlib\nimport json\nimport re\n\nfrom ..round3.claims import POSITION as LEGACY_POSITION, present\n\nPOSITION = LEGACY_POSITION | {\"anatomy\"}\n\n\ndef strip_sides(value, config):\n    if not isinstance(value, str) or not present(value):\n        return value, []\n    original = value\n    changes = []\n    # Avoid interpreting geometric right-angle wording as patient laterality.\n    words = \"|\".join(re.escape(w) for w in config[\"side_words\"] if w != \"right\")\n    pattern = re.compile(r\"\\b(?:\" + words + r\")\\b|\\bright\\b(?![-\\s]+angl)\", re.I)\n    chinese = re.compile(\"|\".join(re.escape(w) for w in config[\"chinese_side_words\"]))\n    both = re.compile(r\"\\bboth\\b(?=\\s+(?:thyroid\\s+)?(?:lobes|sides)\\b)\", re.I)\n    for regex in (pattern, chinese, both):\n        def delete(match):\n            changes.append({\"word\": match.group(0), \"start_in_current_pass\": match.start()})\n            return \"\"\n        value = regex.sub(delete, value)\n    if not changes:\n        return original, []\n    return \" \".join(value.split()) or config[\"none_value\"], changes\n\n\ndef raw_clause(text):\n    return \" \".join(str(text).casefold().split()).strip(\" .;。；\")\n\n\ndef clauses(value):\n    if not isinstance(value, str):\n        return [json.dumps(value, sort_keys=True, ensure_ascii=False)]\n    # Do not split a decimal number such as 1.2 or erase qualifiers/conjunctions.\n    return [p.strip() for p in re.split(r\"(?<=[.!?。])\\s+(?=[A-Za-z])|[;；]\\s*\", value) if p.strip()]\n\n\ndef clause_key(field, value, config):\n    normalized = raw_clause(value)\n    for index, synonyms in enumerate(config[\"aliases\"].get(field, [])):\n        if normalized in {raw_clause(s) for s in synonyms}:\n            return f\"@alias:{field}:{index}\"\n    return normalized\n\n\ndef value_key(field, value, config):\n    if not present(value):\n        return (\"none\",)\n    return tuple(sorted(set(clause_key(field, part, config) for part in clauses(value))))\n\n\ndef dedup_clauses(field, value, config):\n    if not isinstance(value, str) or not present(value):\n        return value\n    parts = clauses(value)\n    kept, seen = [], set()\n    for part in parts:\n        key = clause_key(field, part, config)\n        if key not in seen:\n            kept.append(part)\n            seen.add(key)\n    # Preserve original punctuation/layout unless an actual repeated clause was removed.\n    return value if len(kept) == len(parts) else \" \".join(kept)\n\n\ndef normalize_region(entity, group, config):\n    if entity[\"entity_type\"] not in config[\"core_fields\"]:\n        raise ValueError(\"Unsupported Region entity_type\")\n    result = {k: copy.deepcopy(v) for k, v in entity.items() if k != \"extra_attributes\"}\n    for field in config[\"core_fields\"][entity[\"entity_type\"]]:\n        result.setdefault(field, config[\"none_value\"])\n    trace = []\n    # Original values are retained in the audit; reject itself is not a wildcard.\n    for claim in group[\"claims\"]:\n        if claim[\"source\"] != \"extra_attribute\":\n            result[claim[\"attribute_name\"]] = copy.deepcopy(claim[\"value\"]) if claim[\"decision\"] == \"accept\" else config[\"none_value\"]\n    for field in list(result):\n        if field in {\"region_id\", \"entity_type\"}:\n            continue\n        if not present(result[field]):\n            result[field] = config[\"none_value\"]\n        elif field not in POSITION:\n            original = result[field]\n            result[field], removed = strip_sides(result[field], config)\n            result[field] = dedup_clauses(field, result[field], config)\n            if removed or result[field] != original:\n                trace.append({\"field\": field, \"original\": original, \"normalized\": result[field], \"removed_words\": removed})\n    extras = []\n    seen = set()\n    for claim in group[\"claims\"]:\n        if claim[\"source\"] != \"extra_attribute\":\n            continue\n        name = claim[\"attribute_name\"]\n        value = copy.deepcopy(claim[\"value\"]) if claim[\"decision\"] == \"accept\" else config[\"none_value\"]\n        if not present(value):\n            value = config[\"none_value\"]\n        elif name not in POSITION:\n            original = value\n            value, removed = strip_sides(value, config)\n            value = dedup_clauses(name, value, config)\n            if removed or value != original:\n                trace.append({\"field\": f\"extra:{name}\", \"source_pointer\": claim[\"source_pointer\"],\n                              \"original\": original, \"normalized\": value, \"removed_words\": removed})\n        key = name, value_key(name, value, config)\n        if key not in seen:\n            extras.append({\"attribute_name\": name, \"value\": value})\n            seen.add(key)\n    result[\"extra_attributes\"] = extras\n    return result, trace\n\n\ndef region_signature(region, config):\n    # Absent and explicit none both represent no available value. Neither equals known.\n    fields = set(region) - {\"region_id\", \"entity_type\", \"extra_attributes\"}\n    fields |= set(config[\"core_fields\"][region[\"entity_type\"]])\n    direct = {k: value_key(k, region.get(k), config) for k in sorted(fields)\n              if present(region.get(k))}\n    extra = sorted({(e[\"attribute_name\"], value_key(e[\"attribute_name\"], e.get(\"value\"), config))\n                    for e in region.get(\"extra_attributes\", []) if present(e.get(\"value\"))})\n    return json.dumps({\"entity_type\": region[\"entity_type\"], \"direct\": direct, \"extras\": extra},\n                      sort_keys=True, ensure_ascii=False)\n\n\ndef equivalence_id(signature):\n    return \"region_equivalence_\" + hashlib.sha256(signature.encode()).hexdigest()[:16]\n\n\ndef merge_regions(entries, config, *, case_level=False):\n    \"\"\"Each entry is (Region, source bindings). No union or nearest-neighbor matching.\"\"\"\n    groups = {}\n    for entity, sources in entries:\n        signature = region_signature(entity, config)\n        if signature not in groups:\n            groups[signature] = {\"region\": copy.deepcopy(entity), \"sources\": [], \"input_members\": 0,\n                                 \"equivalence_id\": equivalence_id(signature)}\n        groups[signature][\"input_members\"] += 1\n        groups[signature][\"sources\"].extend(copy.deepcopy(sources))\n    result, mapping = [], []\n    for index, (signature, group) in enumerate(groups.items(), 1):\n        region = group[\"region\"]\n        if case_level:\n            region[\"region_id\"] = f\"region_{index}\"\n        # Every other field must already be equivalent; never fill a none or union values.\n        assert region_signature(region, config) == signature\n        result.append(region)\n        mapping.append({\"region_id\": region[\"region_id\"], \"equivalence_id\": group[\"equivalence_id\"],\n                        \"sources\": group[\"sources\"], \"input_members\": group[\"input_members\"]})\n    return result, mapping\n"
+        },
+        {
+          "path": "r3/round4/schemas/case_report.schema.json",
+          "stage": "round4",
+          "role": "joint_two_image_output_contract",
+          "sha256": "e385eacb79bf74fd4c7bbed3765e37dba988132483ac74c7fe56a2d1a004f488",
+          "format": "json",
+          "content": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "title": "Joint two-image Round4 structured report (including partial audit exports)",
+            "type": "object",
+            "required": [
+              "schema_version",
+              "regions",
+              "instances_by_image"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "schema_version": {
+                "const": "image_grounded_case_round4_v2"
+              },
+              "regions": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "region_id",
+                    "entity_type",
+                    "anatomy",
+                    "laterality",
+                    "extra_attributes"
+                  ],
+                  "properties": {
+                    "region_id": {
+                      "type": "string",
+                      "pattern": "^region_[1-9][0-9]*$"
+                    },
+                    "entity_type": {
+                      "enum": [
+                        "gland_region",
+                        "neck_region",
+                        "isthmus_region"
+                      ]
+                    },
+                    "extra_attributes": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "attribute_name",
+                          "value"
+                        ],
+                        "additionalProperties": false,
+                        "properties": {
+                          "attribute_name": {
+                            "type": "string"
+                          },
+                          "value": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "anatomy": {
+                      "enum": [
+                        "none",
+                        "lobe",
+                        "isthmus",
+                        "neck"
+                      ]
+                    },
+                    "laterality": {
+                      "enum": [
+                        "none",
+                        "left",
+                        "right"
+                      ]
+                    }
+                  },
+                  "additionalProperties": true,
+                  "not": {
+                    "required": [
+                      "anatomic_region"
+                    ]
+                  }
+                }
+              },
+              "instances_by_image": {
+                "type": "object",
+                "minProperties": 2,
+                "maxProperties": 2,
+                "additionalProperties": {
+                  "oneOf": [
+                    {
+                      "type": "null",
+                      "description": "Missing upstream result, NOT an empty negative; excluded from complete training exports."
+                    },
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "instance_id",
+                          "entity_type",
+                          "anatomy",
+                          "laterality"
+                        ],
+                        "properties": {
+                          "instance_id": {
+                            "type": "string"
+                          },
+                          "entity_type": {
+                            "type": "string"
+                          },
+                          "anatomy": {
+                            "enum": [
+                              "none",
+                              "lobe",
+                              "isthmus",
+                              "neck"
+                            ]
+                          },
+                          "laterality": {
+                            "enum": [
+                              "none",
+                              "left",
+                              "right"
+                            ]
+                          }
+                        },
+                        "not": {
+                          "required": [
+                            "anatomic_region"
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

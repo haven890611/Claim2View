@@ -1,0 +1,1081 @@
+{
+  "stage": "r2",
+  "version": "essential-verbatim-knowledge-v2",
+  "note": "Original JSON values, prompts, schemas and embedded rule source; not rewritten rules.",
+  "assets": [
+    {
+      "path": "r2/knowledge/image_card_field_knowledge_v3.json",
+      "stage": "r2",
+      "role": "active_base",
+      "sha256": "a8af68af87d64d396309f2f805a8a3cb4e04820296e0f26e108c834e86656638",
+      "format": "json",
+      "content": {
+        "knowledge_version": "image-card-field-knowledge-v3.1.0",
+        "scope": "Report-blind classification of one saved thyroid or cervical ultrasound image.",
+        "task_boundary": {
+          "allowed_inputs": [
+            "pixels in the current image",
+            "patient-specific text labels visible in the current image",
+            "orientation diagrams visible in the current image"
+          ],
+          "forbidden_inputs": [
+            "the source report",
+            "another image from the same case",
+            "structured-report entities or attributes",
+            "assumptions about the most common acquisition pattern"
+          ],
+          "not_requested": [
+            "diagnosis",
+            "lesion or lymph-node classification",
+            "candidate detection",
+            "report-to-image matching"
+          ]
+        },
+        "sources": [
+          {
+            "source_id": "acr_aium_spr_sru_head_neck_parameter",
+            "title": "ACR-AIUM-SPR-SRU Practice Parameter for the Performance of an Ultrasound Examination of the Extracranial Head and Neck",
+            "url": "https://gravitas.acr.org/PPTS/GetDocumentView?docId=157",
+            "use": "Clinical examination context and cervical/thyroid anatomic coverage."
+          },
+          {
+            "source_id": "aium_thyroid_neck_checklist",
+            "title": "AIUM Thyroid/Neck Case Study Requirements",
+            "url": "https://www.aium.org/docs/default-source/accreditation/case-study-requirements/thyroidneck.pdf",
+            "use": "Standard thyroid and neck image-view context."
+          },
+          {
+            "source_id": "efsumb_thyroid_elastography",
+            "title": "EFSUMB Course Book: Ultrasound of the Thyroid Gland",
+            "url": "https://efsumb.org/wp-content/uploads/2026/02/ECB2nd_ch18-thyroid_rv2026.pdf",
+            "use": "Elastography and thyroid ultrasound modality context."
+          },
+          {
+            "source_id": "project_operationalization",
+            "title": "Project-specific image-card operational rules",
+            "url": null,
+            "use": "Converts clinical context into conservative single-frame labels; these rules are not claimed to be verbatim guideline statements."
+          }
+        ],
+        "global_rules": [
+          {
+            "rule_id": "G01",
+            "instruction": "Judge every field independently from the current image; never repair one field by assuming another field is correct."
+          },
+          {
+            "rule_id": "G02",
+            "instruction": "Prefer positive visible evidence. Absence of one expected landmark is not positive evidence for another class."
+          },
+          {
+            "rule_id": "G03",
+            "instruction": "A readable patient-specific label is strong evidence only when it clearly applies to the diagnostic panel rather than the user interface or a generic diagram."
+          },
+          {
+            "rule_id": "G04",
+            "instruction": "When a label and visible anatomy conflict, preserve the conflict, lower confidence, and use unknown when that class permits abstention."
+          },
+          {
+            "rule_id": "G05",
+            "instruction": "Do not turn object shape, screen position, caliper orientation, or annotation color into an anatomic or modality claim without supporting context."
+          },
+          {
+            "rule_id": "G06",
+            "instruction": "For laterality and anatomy, include only a coherent region that is sufficiently visible to assess; a tiny edge sliver or incidental landmark does not add a value."
+          }
+        ],
+        "confidence_policy": {
+          "meaning": "Estimated support for the selected non-unknown value or complete selected laterality/anatomy set; it is not diagnostic confidence.",
+          "routing_threshold": 0.8,
+          "abstention_threshold": 0.6,
+          "bands": [
+            {
+              "minimum": 0.9,
+              "maximum": 1.0,
+              "basis": "explicit_label_or_unmistakable_overlay",
+              "definition": "A readable patient-specific label or unmistakable modality overlay is concordant with the image."
+            },
+            {
+              "minimum": 0.8,
+              "maximum": 0.89,
+              "basis": "multiple_concordant_cues",
+              "definition": "At least two independent visible cues agree without material conflict."
+            },
+            {
+              "minimum": 0.6,
+              "maximum": 0.79,
+              "basis": "single_or_partial_cue",
+              "definition": "The choice is defensible but rests on one cue, partial coverage, or mild ambiguity; it is not safe for automatic routing."
+            },
+            {
+              "minimum": 0.0,
+              "maximum": 0.59,
+              "basis": "insufficient_conflicting_or_out_of_ontology",
+              "definition": "Evidence is insufficient, conflicting, or outside the fixed ontology. Use unknown where available and always require review."
+            }
+          ],
+          "needs_review_rule": "needs_review is true when confidence is below 0.80, the selected value is unknown, or confidence_basis is conflicting_cues, insufficient_evidence, or out_of_ontology."
+        },
+        "fields": {
+          "plane": {
+            "allowed_values": [
+              "longitudinal",
+              "transverse",
+              "oblique",
+              "unknown"
+            ],
+            "unknown_policy": "Use unknown when no acquisition-plane cue reaches 0.60 confidence. Oblique requires positive evidence and is never an uncertainty fallback.",
+            "rules": [
+              {
+                "rule_id": "P01",
+                "criterion": "A readable patient-specific LONG, LONGITUDINAL, SAG, TRANS, TRANSVERSE, AXIAL, or OBLIQUE label directly supports its corresponding plane.",
+                "caution": "Ignore unrelated user-interface text and generic orientation diagrams."
+              },
+              {
+                "rule_id": "P02",
+                "criterion": "A transverse thyroid view is supported by cross-sectional anatomy such as a central tracheal air interface with thyroid tissue and vascular compartments lateral to it.",
+                "caution": "One round vessel alone is insufficient."
+              },
+              {
+                "rule_id": "P03",
+                "criterion": "A longitudinal thyroid view is supported by an elongated continuous lobe with long-axis vessels or muscle and without a trachea-centered cross-section.",
+                "caution": "An elongated focal object alone does not establish acquisition plane."
+              },
+              {
+                "rule_id": "P04",
+                "criterion": "In a neck image, several vessels or tissue layers consistently seen in long axis support longitudinal, while several circular cross-sections support transverse.",
+                "caution": "Require a compartment-level pattern, not one object."
+              },
+              {
+                "rule_id": "P05",
+                "criterion": "Oblique requires visible intermediate geometry or an explicit oblique label that cannot be explained by longitudinal or transverse acquisition.",
+                "caution": "Never choose oblique merely because the crop is unfamiliar."
+              },
+              {
+                "rule_id": "P06",
+                "criterion": "Caliper direction, target elongation, and screen-wide horizontal orientation are not plane evidence by themselves.",
+                "caution": "Nodules and nodes may be measured along either axis in any acquisition plane."
+              },
+              {
+                "rule_id": "P07",
+                "criterion": "A tight focal crop with no readable plane label and no compartment-level landmarks supports abstention.",
+                "caution": "Do not fill the plane from prevalence."
+              },
+              {
+                "rule_id": "P08",
+                "criterion": "If visible panels imply incompatible acquisition planes, treat the field as conflicting unless one panel is clearly a non-diagnostic reference inset.",
+                "caution": "This dataset expects one acquisition plane per saved image."
+              }
+            ]
+          },
+          "laterality": {
+            "allowed_values": [
+              "left",
+              "right",
+              "midline",
+              "unknown"
+            ],
+            "cardinality": "one_or_more_with_unknown_exclusive",
+            "canonical_order": [
+              "left",
+              "right",
+              "midline",
+              "unknown"
+            ],
+            "unknown_policy": "Return [unknown] alone when no laterality has positive assessable-region evidence. A transverse plane permits but never automatically implies left, right, or midline. Include every supported laterality and no unsupported edge fragment.",
+            "rules": [
+              {
+                "rule_id": "L01",
+                "criterion": "A readable patient-specific L, LT, LEFT, or LTHY label supports inclusion of left; R, RT, RIGHT, or RTHY supports inclusion of right.",
+                "caution": "A side label supports that side but does not prove that other visible sides are absent."
+              },
+              {
+                "rule_id": "L02",
+                "criterion": "A patient-specific orientation diagram with an unambiguous side marker can support assignment of visible tissue to left or right.",
+                "caution": "A generic body icon or screen position without a patient-side marker is insufficient."
+              },
+              {
+                "rule_id": "L03",
+                "criterion": "A clearly assessable central tracheal or isthmus region supports inclusion of midline.",
+                "caution": "A tiny tracheal edge, shadow, or central focal object without a coherent central region does not add midline."
+              },
+              {
+                "rule_id": "L04",
+                "criterion": "A transverse view showing coherent tissue on both sides of a central neck landmark supports inclusion of both left and right even if their screen-side assignment is unnecessary.",
+                "caution": "Transverse plane alone does not imply bilateral coverage."
+              },
+              {
+                "rule_id": "L05",
+                "criterion": "When a transverse view clearly shows assessable left tissue, right tissue, and the intervening central region, select [left, right, midline].",
+                "caution": "All three components must independently meet the visibility threshold."
+              },
+              {
+                "rule_id": "L06",
+                "criterion": "A one-sided transverse crop may include that side plus midline when a reliable label or orientation establishes the side and a coherent central region is also visible.",
+                "caution": "Screen-left and screen-right alone cannot distinguish [left, midline] from [right, midline]."
+              },
+              {
+                "rule_id": "L07",
+                "criterion": "An unlabeled isolated longitudinal thyroid lobe or unilateral neck compartment normally cannot establish left versus right.",
+                "caution": "Object elongation and display position are not side evidence."
+              },
+              {
+                "rule_id": "L08",
+                "criterion": "Each selected laterality must contain coherent tissue or anatomy that is sufficiently visible for independent assessment.",
+                "caution": "Do not include a side or midline from a tiny, ambiguous, shadowed, or non-assessable edge sliver."
+              },
+              {
+                "rule_id": "L09",
+                "criterion": "A readable label and visible coverage must be reconciled across the full image before finalizing the complete laterality set.",
+                "caution": "If label and anatomy materially conflict, lower confidence and use [unknown] when no reliable set remains."
+              },
+              {
+                "rule_id": "L10",
+                "criterion": "When no label, reliable orientation, bilateral relationship, or assessable midline landmark supports a laterality, select [unknown] only.",
+                "caution": "Unknown is exclusive and cannot coexist with left, right, or midline."
+              }
+            ]
+          },
+          "anatomic_region": {
+            "allowed_values": [
+              "thyroid",
+              "neck",
+              "unknown"
+            ],
+            "cardinality": "one_or_more_with_unknown_exclusive",
+            "canonical_order": [
+              "thyroid",
+              "neck",
+              "unknown"
+            ],
+            "unknown_policy": "Return [unknown] alone when neither thyroid nor neck has positive assessable-region evidence. Return [thyroid, neck] only when each region independently meets its inclusion rule.",
+            "rules": [
+              {
+                "rule_id": "A01",
+                "criterion": "A readable THY, LTHY, RTHY, THYROID, or ISTHMUS label over compatible tissue supports thyroid.",
+                "caution": "A label alone is weakened if it clearly belongs to a generic diagram or conflicts with the tissue."
+              },
+              {
+                "rule_id": "A02",
+                "criterion": "Continuous thyroid-like parenchyma anterolateral to the trachea, deep to strap muscles, and medial to the carotid supports thyroid.",
+                "caution": "A homogeneous focal mass without compartment continuity is insufficient."
+              },
+              {
+                "rule_id": "A03",
+                "criterion": "A readable NECK, LN, NODE, or cervical-level I through VI label over compatible tissue supports neck.",
+                "caution": "Confirm that the label applies to the diagnostic panel."
+              },
+              {
+                "rule_id": "A04",
+                "criterion": "An intentionally targeted cervical soft-tissue compartment or extra-thyroid structure outside continuous thyroid parenchyma supports neck.",
+                "caution": "A focal object alone cannot prove whether it lies in thyroid or neck."
+              },
+              {
+                "rule_id": "A05",
+                "criterion": "Select both thyroid and neck only when coherent thyroid tissue and a separately assessable extra-thyroid cervical region each have positive evidence in the same image.",
+                "caution": "Both values describe meaningful diagnostic content, not every tissue crossed by the ultrasound beam."
+              },
+              {
+                "rule_id": "A06",
+                "criterion": "Normal strap muscle, trachea, carotid, or jugular seen only as a thyroid landmark does not by itself add neck.",
+                "caution": "This prevents nearly every thyroid image from becoming thyroid plus neck."
+              },
+              {
+                "rule_id": "A07",
+                "criterion": "A tiny, ambiguous, or non-assessable edge fragment of a second region does not add that region.",
+                "caution": "The second region must be coherent enough for independent visual assessment."
+              },
+              {
+                "rule_id": "A08",
+                "criterion": "A thyroid bed without visible thyroid tissue is classified as neck unless assessable residual thyroid parenchyma is also visible.",
+                "caution": "Do not equate the expected thyroid location with visible thyroid tissue."
+              },
+              {
+                "rule_id": "A09",
+                "criterion": "When neither thyroid continuity nor an intentional neck compartment can be established, select unknown only.",
+                "caution": "Absence of a thyroid label alone never proves neck."
+              }
+            ]
+          },
+          "modality": {
+            "allowed_values": [
+              "b_mode",
+              "color_doppler",
+              "elastography"
+            ],
+            "unknown_policy": "This dataset's three-class modality ontology has no unknown. Combined multi-image displays are excluded by dataset design. For unsupported or out-of-ontology displays, choose the closest visible class with confidence below 0.60 and needs_review true.",
+            "rules": [
+              {
+                "rule_id": "M01",
+                "criterion": "A diagnostic panel containing grayscale echoes only supports b_mode.",
+                "caution": "Colored text, calipers, arrows, focus markers, and ROI borders do not change modality."
+              },
+              {
+                "rule_id": "M02",
+                "criterion": "Localized red, blue, or multicolor flow pixels within a Doppler ROI over grayscale anatomy support color_doppler.",
+                "caution": "A color scale or UI icon without flow pixels is insufficient."
+              },
+              {
+                "rule_id": "M03",
+                "criterion": "Power Doppler or other direction-independent colored flow signal is classified as color_doppler.",
+                "caution": "Do not require the classic red-blue directional pair."
+              },
+              {
+                "rule_id": "M04",
+                "criterion": "A broad continuous tissue stiffness, strain, or shear-wave map with an elastography scale or stiffness units supports elastography.",
+                "caution": "Scattered vascular flow pixels are not elastography."
+              },
+              {
+                "rule_id": "M05",
+                "criterion": "The grayscale anatomical background inside a Doppler panel remains part of color_doppler and does not create a second modality class.",
+                "caution": "Classify the active diagnostic overlay rather than counting its grayscale background separately."
+              },
+              {
+                "rule_id": "M06",
+                "criterion": "A grayscale reference inset paired with a stiffness map is classified as elastography when the reference exists only to interpret the elastogram.",
+                "caution": "The reference inset does not create a separate combined-image class."
+              },
+              {
+                "rule_id": "M07",
+                "criterion": "A genuinely combined multi-image display is outside this dataset contract and must not be assigned a synthetic modality class.",
+                "caution": "If unexpectedly observed, choose the closest visible supported class with confidence below 0.60, out_of_ontology, and needs_review true."
+              },
+              {
+                "rule_id": "M08",
+                "criterion": "A color map should be identified from its spatial behavior: flow is sparse and vessel-localized, while elastography is broad and tissue-filling.",
+                "caution": "When behavior and legend conflict, lower confidence and require review."
+              },
+              {
+                "rule_id": "M09",
+                "criterion": "Spectral-only or otherwise unsupported ultrasound displays are outside the fixed four-class ontology.",
+                "caution": "Keep the closest visible class low-confidence and mark needs_review rather than silently treating it as certain."
+              }
+            ]
+          }
+        },
+        "rule_assessment_contract": {
+          "required_status_values": [
+            "supports",
+            "contradicts",
+            "not_observed",
+            "not_applicable"
+          ],
+          "instruction": "Assess every field rule exactly once, in file order. Each observation must state only concise, directly visible evidence or the specific missing cue; do not provide hidden chain-of-thought."
+        }
+      }
+    },
+    {
+      "path": "r2/knowledge/anatomic_region_thyroid_visibility_v32.json",
+      "stage": "r2",
+      "role": "active_anatomy_overlay",
+      "sha256": "a188bd20307cbef6c9bdcef534f067a10d4e77a465999225653e0be1e89e2d75",
+      "format": "json",
+      "content": {
+        "allowed_values": [
+          "thyroid",
+          "neck",
+          "unknown"
+        ],
+        "cardinality": "one_or_more_with_unknown_exclusive",
+        "canonical_order": [
+          "thyroid",
+          "neck",
+          "unknown"
+        ],
+        "unknown_policy": "Judge visible thyroid tissue first. Lack of thyroid evidence never proves neck. Include neck only with independent positive extra-thyroid evidence. Return [unknown] alone when neither visible thyroid tissue nor a positively anchored neck target is established. Return [thyroid, neck] only when both are independently and coherently assessable.",
+        "rules": [
+          {
+            "rule_id": "A01",
+            "criterion": "A readable THY, LTHY, RTHY, THYROID, or ISTHMUS label, or an unmistakable patient-specific thyroid orientation diagram, over compatible tissue supports visible thyroid.",
+            "caution": "A generic left/right marker, generic body diagram, or incompatible tissue does not establish thyroid. Add dataset-specific abbreviations only after separate validation."
+          },
+          {
+            "rule_id": "A02",
+            "criterion": "A coherent elongated thyroid-like parenchymal compartment deep to superficial strap muscle supports visible thyroid in a longitudinal or partial longitudinal view; a visible trachea and carotid are not both required.",
+            "caution": "Do not require every classic landmark simultaneously, but a focal object or generic layered soft tissue without coherent gland-like continuity is insufficient."
+          },
+          {
+            "rule_id": "A03",
+            "criterion": "In a transverse or partial transverse view, coherent gland-like tissue in a plausible relationship to a medial tracheal air interface or a lateral carotid-jugular structure supports visible thyroid.",
+            "caution": "One compatible compartment relationship plus coherent parenchyma may suffice; a vessel, airway shadow, or muscle alone does not."
+          },
+          {
+            "rule_id": "A04",
+            "criterion": "A lesion-dominant view supports visible thyroid when a coherent rim or continuous background of thyroid-like parenchyma places the target within a gland compartment.",
+            "caution": "Target echogenicity, shape, calipers, or a focal object by itself cannot distinguish thyroid from neck."
+          },
+          {
+            "rule_id": "A05",
+            "criterion": "Neck requires an independent positive extra-thyroid anchor: a readable NECK, LN, NODE, or cervical-level label over compatible tissue, a clearly deliberate nodal-chain or cervical-compartment survey, or a target visibly separated from any coherent thyroid compartment.",
+            "caution": "The neck anchor must be directly visible. Failure to recognize thyroid is not a neck anchor."
+          },
+          {
+            "rule_id": "A06",
+            "criterion": "Layered soft tissue, strap muscle, a carotid or jugular vessel, a focal object, or a tight crop without compartment continuity supports neither thyroid nor neck by itself.",
+            "caution": "These common findings must not trigger neck merely because full thyroid continuity is absent."
+          },
+          {
+            "rule_id": "A07",
+            "criterion": "Select neck alone only when rule A05 has positive neck evidence and no assessable thyroid tissue is supported by A01 through A04.",
+            "caution": "An absent thyroid label, incomplete landmarks, or uncertain thyroid visibility cannot by itself justify neck alone."
+          },
+          {
+            "rule_id": "A08",
+            "criterion": "Select both thyroid and neck only when A01 through A04 establish coherent thyroid tissue and A05 independently establishes a meaningful extra-thyroid neck target in the same image.",
+            "caution": "Incidental muscle, trachea, carotid, jugular, or a tiny edge fragment does not add neck to a thyroid image."
+          },
+          {
+            "rule_id": "A09",
+            "criterion": "Use this decision order: first test visible thyroid with A01 through A04, then test positive neck evidence with A05, apply A07 or A08, and otherwise return unknown.",
+            "caution": "Unknown is required for an indeterminate focal crop; never convert absence of thyroid evidence into positive neck evidence."
+          }
+        ]
+      }
+    },
+    {
+      "path": "r2/results/full_dataset/effective_knowledge.json",
+      "stage": "r2",
+      "role": "active_rendered_knowledge",
+      "sha256": "de67f7d84fc3db67c8b503829f2f29c9a7a84970bf519001c86b780660e8e9bd",
+      "format": "json",
+      "content": {
+        "knowledge_version": "image-card-field-knowledge-v3.1.0",
+        "scope": "Report-blind classification of one saved thyroid or cervical ultrasound image.",
+        "task_boundary": {
+          "allowed_inputs": [
+            "pixels in the current image",
+            "patient-specific text labels visible in the current image",
+            "orientation diagrams visible in the current image"
+          ],
+          "forbidden_inputs": [
+            "the source report",
+            "another image from the same case",
+            "structured-report entities or attributes",
+            "assumptions about the most common acquisition pattern"
+          ],
+          "not_requested": [
+            "diagnosis",
+            "lesion or lymph-node classification",
+            "candidate detection",
+            "report-to-image matching"
+          ]
+        },
+        "sources": [
+          {
+            "source_id": "acr_aium_spr_sru_head_neck_parameter",
+            "title": "ACR-AIUM-SPR-SRU Practice Parameter for the Performance of an Ultrasound Examination of the Extracranial Head and Neck",
+            "url": "https://gravitas.acr.org/PPTS/GetDocumentView?docId=157",
+            "use": "Clinical examination context and cervical/thyroid anatomic coverage."
+          },
+          {
+            "source_id": "aium_thyroid_neck_checklist",
+            "title": "AIUM Thyroid/Neck Case Study Requirements",
+            "url": "https://www.aium.org/docs/default-source/accreditation/case-study-requirements/thyroidneck.pdf",
+            "use": "Standard thyroid and neck image-view context."
+          },
+          {
+            "source_id": "efsumb_thyroid_elastography",
+            "title": "EFSUMB Course Book: Ultrasound of the Thyroid Gland",
+            "url": "https://efsumb.org/wp-content/uploads/2026/02/ECB2nd_ch18-thyroid_rv2026.pdf",
+            "use": "Elastography and thyroid ultrasound modality context."
+          },
+          {
+            "source_id": "project_operationalization",
+            "title": "Project-specific image-card operational rules",
+            "url": null,
+            "use": "Converts clinical context into conservative single-frame labels; these rules are not claimed to be verbatim guideline statements."
+          }
+        ],
+        "global_rules": [
+          {
+            "rule_id": "G01",
+            "instruction": "Judge every field independently from the current image; never repair one field by assuming another field is correct."
+          },
+          {
+            "rule_id": "G02",
+            "instruction": "Prefer positive visible evidence. Absence of one expected landmark is not positive evidence for another class."
+          },
+          {
+            "rule_id": "G03",
+            "instruction": "A readable patient-specific label is strong evidence only when it clearly applies to the diagnostic panel rather than the user interface or a generic diagram."
+          },
+          {
+            "rule_id": "G04",
+            "instruction": "When a label and visible anatomy conflict, preserve the conflict, lower confidence, and use unknown when that class permits abstention."
+          },
+          {
+            "rule_id": "G05",
+            "instruction": "Do not turn object shape, screen position, caliper orientation, or annotation color into an anatomic or modality claim without supporting context."
+          },
+          {
+            "rule_id": "G06",
+            "instruction": "For laterality and anatomy, include only a coherent region that is sufficiently visible to assess; a tiny edge sliver or incidental landmark does not add a value."
+          }
+        ],
+        "confidence_policy": {
+          "meaning": "Estimated support for the selected non-unknown value or complete selected laterality/anatomy set; it is not diagnostic confidence.",
+          "routing_threshold": 0.8,
+          "abstention_threshold": 0.6,
+          "bands": [
+            {
+              "minimum": 0.9,
+              "maximum": 1.0,
+              "basis": "explicit_label_or_unmistakable_overlay",
+              "definition": "A readable patient-specific label or unmistakable modality overlay is concordant with the image."
+            },
+            {
+              "minimum": 0.8,
+              "maximum": 0.89,
+              "basis": "multiple_concordant_cues",
+              "definition": "At least two independent visible cues agree without material conflict."
+            },
+            {
+              "minimum": 0.6,
+              "maximum": 0.79,
+              "basis": "single_or_partial_cue",
+              "definition": "The choice is defensible but rests on one cue, partial coverage, or mild ambiguity; it is not safe for automatic routing."
+            },
+            {
+              "minimum": 0.0,
+              "maximum": 0.59,
+              "basis": "insufficient_conflicting_or_out_of_ontology",
+              "definition": "Evidence is insufficient, conflicting, or outside the fixed ontology. Use unknown where available and always require review."
+            }
+          ],
+          "needs_review_rule": "needs_review is true when confidence is below 0.80, the selected value is unknown, or confidence_basis is conflicting_cues, insufficient_evidence, or out_of_ontology."
+        },
+        "fields": {
+          "plane": {
+            "allowed_values": [
+              "longitudinal",
+              "transverse",
+              "oblique",
+              "unknown"
+            ],
+            "unknown_policy": "Use unknown when no acquisition-plane cue reaches 0.60 confidence. Oblique requires positive evidence and is never an uncertainty fallback.",
+            "rules": [
+              {
+                "rule_id": "P01",
+                "criterion": "A readable patient-specific LONG, LONGITUDINAL, SAG, TRANS, TRANSVERSE, AXIAL, or OBLIQUE label directly supports its corresponding plane.",
+                "caution": "Ignore unrelated user-interface text and generic orientation diagrams."
+              },
+              {
+                "rule_id": "P02",
+                "criterion": "A transverse thyroid view is supported by cross-sectional anatomy such as a central tracheal air interface with thyroid tissue and vascular compartments lateral to it.",
+                "caution": "One round vessel alone is insufficient."
+              },
+              {
+                "rule_id": "P03",
+                "criterion": "A longitudinal thyroid view is supported by an elongated continuous lobe with long-axis vessels or muscle and without a trachea-centered cross-section.",
+                "caution": "An elongated focal object alone does not establish acquisition plane."
+              },
+              {
+                "rule_id": "P04",
+                "criterion": "In a neck image, several vessels or tissue layers consistently seen in long axis support longitudinal, while several circular cross-sections support transverse.",
+                "caution": "Require a compartment-level pattern, not one object."
+              },
+              {
+                "rule_id": "P05",
+                "criterion": "Oblique requires visible intermediate geometry or an explicit oblique label that cannot be explained by longitudinal or transverse acquisition.",
+                "caution": "Never choose oblique merely because the crop is unfamiliar."
+              },
+              {
+                "rule_id": "P06",
+                "criterion": "Caliper direction, target elongation, and screen-wide horizontal orientation are not plane evidence by themselves.",
+                "caution": "Nodules and nodes may be measured along either axis in any acquisition plane."
+              },
+              {
+                "rule_id": "P07",
+                "criterion": "A tight focal crop with no readable plane label and no compartment-level landmarks supports abstention.",
+                "caution": "Do not fill the plane from prevalence."
+              },
+              {
+                "rule_id": "P08",
+                "criterion": "If visible panels imply incompatible acquisition planes, treat the field as conflicting unless one panel is clearly a non-diagnostic reference inset.",
+                "caution": "This dataset expects one acquisition plane per saved image."
+              }
+            ]
+          },
+          "laterality": {
+            "allowed_values": [
+              "left",
+              "right",
+              "midline",
+              "unknown"
+            ],
+            "cardinality": "one_or_more_with_unknown_exclusive",
+            "canonical_order": [
+              "left",
+              "right",
+              "midline",
+              "unknown"
+            ],
+            "unknown_policy": "Return [unknown] alone when no laterality has positive assessable-region evidence. A transverse plane permits but never automatically implies left, right, or midline. Include every supported laterality and no unsupported edge fragment.",
+            "rules": [
+              {
+                "rule_id": "L01",
+                "criterion": "A readable patient-specific L, LT, LEFT, or LTHY label supports inclusion of left; R, RT, RIGHT, or RTHY supports inclusion of right.",
+                "caution": "A side label supports that side but does not prove that other visible sides are absent."
+              },
+              {
+                "rule_id": "L02",
+                "criterion": "A patient-specific orientation diagram with an unambiguous side marker can support assignment of visible tissue to left or right.",
+                "caution": "A generic body icon or screen position without a patient-side marker is insufficient."
+              },
+              {
+                "rule_id": "L03",
+                "criterion": "A clearly assessable central tracheal or isthmus region supports inclusion of midline.",
+                "caution": "A tiny tracheal edge, shadow, or central focal object without a coherent central region does not add midline."
+              },
+              {
+                "rule_id": "L04",
+                "criterion": "A transverse view showing coherent tissue on both sides of a central neck landmark supports inclusion of both left and right even if their screen-side assignment is unnecessary.",
+                "caution": "Transverse plane alone does not imply bilateral coverage."
+              },
+              {
+                "rule_id": "L05",
+                "criterion": "When a transverse view clearly shows assessable left tissue, right tissue, and the intervening central region, select [left, right, midline].",
+                "caution": "All three components must independently meet the visibility threshold."
+              },
+              {
+                "rule_id": "L06",
+                "criterion": "A one-sided transverse crop may include that side plus midline when a reliable label or orientation establishes the side and a coherent central region is also visible.",
+                "caution": "Screen-left and screen-right alone cannot distinguish [left, midline] from [right, midline]."
+              },
+              {
+                "rule_id": "L07",
+                "criterion": "An unlabeled isolated longitudinal thyroid lobe or unilateral neck compartment normally cannot establish left versus right.",
+                "caution": "Object elongation and display position are not side evidence."
+              },
+              {
+                "rule_id": "L08",
+                "criterion": "Each selected laterality must contain coherent tissue or anatomy that is sufficiently visible for independent assessment.",
+                "caution": "Do not include a side or midline from a tiny, ambiguous, shadowed, or non-assessable edge sliver."
+              },
+              {
+                "rule_id": "L09",
+                "criterion": "A readable label and visible coverage must be reconciled across the full image before finalizing the complete laterality set.",
+                "caution": "If label and anatomy materially conflict, lower confidence and use [unknown] when no reliable set remains."
+              },
+              {
+                "rule_id": "L10",
+                "criterion": "When no label, reliable orientation, bilateral relationship, or assessable midline landmark supports a laterality, select [unknown] only.",
+                "caution": "Unknown is exclusive and cannot coexist with left, right, or midline."
+              }
+            ]
+          },
+          "anatomic_region": {
+            "allowed_values": [
+              "thyroid",
+              "neck",
+              "unknown"
+            ],
+            "cardinality": "one_or_more_with_unknown_exclusive",
+            "canonical_order": [
+              "thyroid",
+              "neck",
+              "unknown"
+            ],
+            "unknown_policy": "Judge visible thyroid tissue first. Lack of thyroid evidence never proves neck. Include neck only with independent positive extra-thyroid evidence. Return [unknown] alone when neither visible thyroid tissue nor a positively anchored neck target is established. Return [thyroid, neck] only when both are independently and coherently assessable.",
+            "rules": [
+              {
+                "rule_id": "A01",
+                "criterion": "A readable THY, LTHY, RTHY, THYROID, or ISTHMUS label, or an unmistakable patient-specific thyroid orientation diagram, over compatible tissue supports visible thyroid.",
+                "caution": "A generic left/right marker, generic body diagram, or incompatible tissue does not establish thyroid. Add dataset-specific abbreviations only after separate validation."
+              },
+              {
+                "rule_id": "A02",
+                "criterion": "A coherent elongated thyroid-like parenchymal compartment deep to superficial strap muscle supports visible thyroid in a longitudinal or partial longitudinal view; a visible trachea and carotid are not both required.",
+                "caution": "Do not require every classic landmark simultaneously, but a focal object or generic layered soft tissue without coherent gland-like continuity is insufficient."
+              },
+              {
+                "rule_id": "A03",
+                "criterion": "In a transverse or partial transverse view, coherent gland-like tissue in a plausible relationship to a medial tracheal air interface or a lateral carotid-jugular structure supports visible thyroid.",
+                "caution": "One compatible compartment relationship plus coherent parenchyma may suffice; a vessel, airway shadow, or muscle alone does not."
+              },
+              {
+                "rule_id": "A04",
+                "criterion": "A lesion-dominant view supports visible thyroid when a coherent rim or continuous background of thyroid-like parenchyma places the target within a gland compartment.",
+                "caution": "Target echogenicity, shape, calipers, or a focal object by itself cannot distinguish thyroid from neck."
+              },
+              {
+                "rule_id": "A05",
+                "criterion": "Neck requires an independent positive extra-thyroid anchor: a readable NECK, LN, NODE, or cervical-level label over compatible tissue, a clearly deliberate nodal-chain or cervical-compartment survey, or a target visibly separated from any coherent thyroid compartment.",
+                "caution": "The neck anchor must be directly visible. Failure to recognize thyroid is not a neck anchor."
+              },
+              {
+                "rule_id": "A06",
+                "criterion": "Layered soft tissue, strap muscle, a carotid or jugular vessel, a focal object, or a tight crop without compartment continuity supports neither thyroid nor neck by itself.",
+                "caution": "These common findings must not trigger neck merely because full thyroid continuity is absent."
+              },
+              {
+                "rule_id": "A07",
+                "criterion": "Select neck alone only when rule A05 has positive neck evidence and no assessable thyroid tissue is supported by A01 through A04.",
+                "caution": "An absent thyroid label, incomplete landmarks, or uncertain thyroid visibility cannot by itself justify neck alone."
+              },
+              {
+                "rule_id": "A08",
+                "criterion": "Select both thyroid and neck only when A01 through A04 establish coherent thyroid tissue and A05 independently establishes a meaningful extra-thyroid neck target in the same image.",
+                "caution": "Incidental muscle, trachea, carotid, jugular, or a tiny edge fragment does not add neck to a thyroid image."
+              },
+              {
+                "rule_id": "A09",
+                "criterion": "Use this decision order: first test visible thyroid with A01 through A04, then test positive neck evidence with A05, apply A07 or A08, and otherwise return unknown.",
+                "caution": "Unknown is required for an indeterminate focal crop; never convert absence of thyroid evidence into positive neck evidence."
+              }
+            ]
+          },
+          "modality": {
+            "allowed_values": [
+              "b_mode",
+              "color_doppler",
+              "elastography"
+            ],
+            "unknown_policy": "This dataset's three-class modality ontology has no unknown. Combined multi-image displays are excluded by dataset design. For unsupported or out-of-ontology displays, choose the closest visible class with confidence below 0.60 and needs_review true.",
+            "rules": [
+              {
+                "rule_id": "M01",
+                "criterion": "A diagnostic panel containing grayscale echoes only supports b_mode.",
+                "caution": "Colored text, calipers, arrows, focus markers, and ROI borders do not change modality."
+              },
+              {
+                "rule_id": "M02",
+                "criterion": "Localized red, blue, or multicolor flow pixels within a Doppler ROI over grayscale anatomy support color_doppler.",
+                "caution": "A color scale or UI icon without flow pixels is insufficient."
+              },
+              {
+                "rule_id": "M03",
+                "criterion": "Power Doppler or other direction-independent colored flow signal is classified as color_doppler.",
+                "caution": "Do not require the classic red-blue directional pair."
+              },
+              {
+                "rule_id": "M04",
+                "criterion": "A broad continuous tissue stiffness, strain, or shear-wave map with an elastography scale or stiffness units supports elastography.",
+                "caution": "Scattered vascular flow pixels are not elastography."
+              },
+              {
+                "rule_id": "M05",
+                "criterion": "The grayscale anatomical background inside a Doppler panel remains part of color_doppler and does not create a second modality class.",
+                "caution": "Classify the active diagnostic overlay rather than counting its grayscale background separately."
+              },
+              {
+                "rule_id": "M06",
+                "criterion": "A grayscale reference inset paired with a stiffness map is classified as elastography when the reference exists only to interpret the elastogram.",
+                "caution": "The reference inset does not create a separate combined-image class."
+              },
+              {
+                "rule_id": "M07",
+                "criterion": "A genuinely combined multi-image display is outside this dataset contract and must not be assigned a synthetic modality class.",
+                "caution": "If unexpectedly observed, choose the closest visible supported class with confidence below 0.60, out_of_ontology, and needs_review true."
+              },
+              {
+                "rule_id": "M08",
+                "criterion": "A color map should be identified from its spatial behavior: flow is sparse and vessel-localized, while elastography is broad and tissue-filling.",
+                "caution": "When behavior and legend conflict, lower confidence and require review."
+              },
+              {
+                "rule_id": "M09",
+                "criterion": "Spectral-only or otherwise unsupported ultrasound displays are outside the fixed four-class ontology.",
+                "caution": "Keep the closest visible class low-confidence and mark needs_review rather than silently treating it as certain."
+              }
+            ]
+          }
+        },
+        "rule_assessment_contract": {
+          "required_status_values": [
+            "supports",
+            "contradicts",
+            "not_observed",
+            "not_applicable"
+          ],
+          "instruction": "Assess every field rule exactly once, in file order. Each observation must state only concise, directly visible evidence or the specific missing cue; do not provide hidden chain-of-thought."
+        }
+      }
+    },
+    {
+      "path": "r2/prompts/image_card_knowledge_v3.txt",
+      "stage": "r2",
+      "role": "active_prompt",
+      "sha256": "6d1355c79f4bbeee75a117b4da5c2724a15eec184e81bbfa700b86f896667692",
+      "format": "txt",
+      "content": "Assess exactly one thyroid/cervical ultrasound image. Use only the attached image\nand the embedded knowledge contract below. Never use the report, another case\nimage, a structured report, or prevalence. Return only schema-valid JSON. Do not\ndiagnose, classify a lesion/node, locate candidates, or reveal hidden chain-of-\nthought. Rule observations must contain only concise, directly visible evidence\nor the specific visible cue that is absent.\n\nFixed identifiers:\n- uid: {uid}\n- image_index: {image_index}\n- image_id: {image_id}\n\nRequired procedure for EACH field in this exact field order:\n1. Read that field's allowed values, unknown policy, and every rule from the\n   knowledge JSON.\n2. Emit one rule_assessments item for every rule, in the exact file order. Copy\n   each rule_id exactly and choose supports, contradicts, not_observed, or\n   not_applicable. Never omit or add a rule.\n3. Select the value or values only after all rule assessments. Keep\n   decision_evidence under 35 words and grounded in visible pixels, text,\n   geometry, or anatomy.\n4. Apply the confidence bands literally. confidence estimates support for the\n   selected non-unknown value, or for the COMPLETE selected laterality/anatomy\n   set. A value below 0.80 is not safe for automatic routing.\n5. Set needs_review=true exactly when confidence is below 0.80, the selected value\n   is unknown, or confidence_basis is conflicting_cues, insufficient_evidence,\n   or out_of_ontology. Otherwise set it false.\n\nANATOMIC REGION IS MULTI-SELECT:\n- values may be [\"thyroid\"], [\"neck\"], [\"thyroid\", \"neck\"], or [\"unknown\"].\n- Preserve the canonical order thyroid then neck.\n- unknown is exclusive and cannot appear with another value.\n- Select both only if each is independently coherent, intentionally visible, and\n  assessable. Incidental strap muscle, trachea, carotid, jugular, or a tiny edge\n  sliver does not add neck to a thyroid image.\n\nLATERALITY IS MULTI-SELECT:\n- values is a canonical non-empty subset of left, right, midline, in that order;\n  or exactly [\"unknown\"]. All combinations are permitted, including\n  [\"left\", \"right\", \"midline\"].\n- unknown is exclusive and cannot appear with another value.\n- plane=transverse permits but never automatically supplies any laterality.\n- Include each side only when coherent tissue from that side is assessable.\n- Include midline only when a coherent central region such as the tracheal or\n  isthmus region is assessable; a tiny central edge or shadow is insufficient.\n- confidence applies to the completeness of the entire selected set. Missing or\n  adding one laterality makes the set incorrect.\n\nABSTENTION:\n- plane: below 0.60 support requires value=unknown.\n- laterality/anatomic_region: below 0.60 support requires values=[\"unknown\"].\n  All abstentions require needs_review=true.\n- modality has exactly three classes: b_mode, color_doppler, and elastography;\n  mixed does not exist because the dataset contains no combined multi-image\n  displays. Modality has no unknown. If a display is unsupported, choose the\n  closest visible class, confidence below 0.60,\n  confidence_basis=out_of_ontology, and needs_review=true.\n\nKNOWLEDGE JSON (authoritative for this call):\n{knowledge_json}\n"
+    },
+    {
+      "path": "r2/schemas/image_card_knowledge_v3.schema.json",
+      "stage": "r2",
+      "role": "active_output_contract",
+      "sha256": "c6bf68afc9345f2b361ec72804cb75b1fa2a7fc6beef1ac4d4951abdc44c2c35",
+      "format": "json",
+      "content": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "uid",
+          "image_index",
+          "image_id",
+          "plane",
+          "laterality",
+          "anatomic_region",
+          "modality"
+        ],
+        "properties": {
+          "uid": {
+            "type": "string",
+            "minLength": 1
+          },
+          "image_index": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2
+          },
+          "image_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "plane": {
+            "$ref": "#/$defs/plane_decision"
+          },
+          "laterality": {
+            "$ref": "#/$defs/laterality_decision"
+          },
+          "anatomic_region": {
+            "$ref": "#/$defs/anatomy_decision"
+          },
+          "modality": {
+            "$ref": "#/$defs/modality_decision"
+          }
+        },
+        "$defs": {
+          "rule_assessment": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "rule_id",
+              "status",
+              "observation"
+            ],
+            "properties": {
+              "rule_id": {
+                "type": "string",
+                "minLength": 2
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "supports",
+                  "contradicts",
+                  "not_observed",
+                  "not_applicable"
+                ]
+              },
+              "observation": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 300
+              }
+            }
+          },
+          "confidence_basis": {
+            "type": "string",
+            "enum": [
+              "explicit_label_or_unmistakable_overlay",
+              "multiple_concordant_cues",
+              "single_or_partial_cue",
+              "conflicting_cues",
+              "insufficient_evidence",
+              "out_of_ontology"
+            ]
+          },
+          "plane_decision": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "rule_assessments",
+              "decision_evidence",
+              "value",
+              "confidence",
+              "confidence_basis",
+              "needs_review"
+            ],
+            "properties": {
+              "rule_assessments": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/rule_assessment"
+                }
+              },
+              "decision_evidence": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 400
+              },
+              "value": {
+                "type": "string",
+                "enum": [
+                  "longitudinal",
+                  "transverse",
+                  "oblique",
+                  "unknown"
+                ]
+              },
+              "confidence": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "confidence_basis": {
+                "$ref": "#/$defs/confidence_basis"
+              },
+              "needs_review": {
+                "type": "boolean"
+              }
+            }
+          },
+          "laterality_decision": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "rule_assessments",
+              "decision_evidence",
+              "values",
+              "confidence",
+              "confidence_basis",
+              "needs_review"
+            ],
+            "properties": {
+              "rule_assessments": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/rule_assessment"
+                }
+              },
+              "decision_evidence": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 400
+              },
+              "values": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 3,
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "left",
+                    "right",
+                    "midline",
+                    "unknown"
+                  ]
+                }
+              },
+              "confidence": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "confidence_basis": {
+                "$ref": "#/$defs/confidence_basis"
+              },
+              "needs_review": {
+                "type": "boolean"
+              }
+            }
+          },
+          "anatomy_decision": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "rule_assessments",
+              "decision_evidence",
+              "values",
+              "confidence",
+              "confidence_basis",
+              "needs_review"
+            ],
+            "properties": {
+              "rule_assessments": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/rule_assessment"
+                }
+              },
+              "decision_evidence": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 400
+              },
+              "values": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 2,
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "thyroid",
+                    "neck",
+                    "unknown"
+                  ]
+                }
+              },
+              "confidence": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "confidence_basis": {
+                "$ref": "#/$defs/confidence_basis"
+              },
+              "needs_review": {
+                "type": "boolean"
+              }
+            }
+          },
+          "modality_decision": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "rule_assessments",
+              "decision_evidence",
+              "value",
+              "confidence",
+              "confidence_basis",
+              "needs_review"
+            ],
+            "properties": {
+              "rule_assessments": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/rule_assessment"
+                }
+              },
+              "decision_evidence": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 400
+              },
+              "value": {
+                "type": "string",
+                "enum": [
+                  "b_mode",
+                  "color_doppler",
+                  "elastography"
+                ]
+              },
+              "confidence": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "confidence_basis": {
+                "$ref": "#/$defs/confidence_basis"
+              },
+              "needs_review": {
+                "type": "boolean"
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}
